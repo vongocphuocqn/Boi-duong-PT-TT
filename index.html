@@ -489,8 +489,21 @@
       </div>
     </div>
     <details class="card" open>
-      <summary>Top 10 nhân viên có tổng thu nhập cao nhất</summary>
-      <div class="card-body"><div id="topChart"></div></div>
+      <summary>Thu nhập theo nhân viên (xếp giảm dần)</summary>
+      <div class="card-body">
+        <div class="row" style="align-items:center; margin-bottom:8px;">
+          <div class="col" style="max-width:200px;">
+            <label>Hiện</label>
+            <select id="topCount">
+              <option value="10">Top 10</option>
+              <option value="20">Top 20</option>
+              <option value="50">Top 50</option>
+              <option value="all">Tất cả nhân viên</option>
+            </select>
+          </div>
+        </div>
+        <div id="topChart"></div>
+      </div>
     </details>
     <div class="row">
       <details class="col card" open>
@@ -798,6 +811,7 @@ async function init(){
   document.getElementById('monthlyTo').addEventListener('change', renderMonthlyStats);
   document.getElementById('btnMonthlyExport').addEventListener('click', exportMonthlyExcel);
   document.getElementById('btnStatsCompute').addEventListener('click', computeStatsRange);
+  document.getElementById('topCount').addEventListener('change', renderStatsCharts);
   // default date range = this month
   const now = new Date();
   const first = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -2021,11 +2035,12 @@ async function exportZaloWord(){
   </style></head>
   <body>
     <p class="center"><b>${ctx.label}</b></p>
-    <table class="wrap"><tr>
-      <td>
+    <table class="wrap" border="0" cellspacing="0" cellpadding="0"><tr>
+      <td style="border:none;">
         <table class="gmdc"><tr>${headerCells}</tr>${gmRowsHtml}${gmTotalRow}</table>
       </td>
-      <td>
+      <td style="border:none; width:40px;">&nbsp;</td>
+      <td style="border:none;">
         <table class="gmdc"><tr>${headerCells}</tr>${dcRowsHtml}${dcTotalRow}</table>
       </td>
     </tr></table>
@@ -2216,8 +2231,10 @@ function renderStatsCharts(){
     document.getElementById('trendChart').innerHTML='';
     return;
   }
-  const top = res.list.slice(0,10).map(x=>({n:x.name, v:x.total}));
-  barChart(document.getElementById('topChart'), top, 10);
+  const topCountVal = document.getElementById('topCount').value;
+  const topN = topCountVal==='all' ? res.list.length : parseInt(topCountVal);
+  const top = res.list.slice(0, topN).map(x=>({n:x.name, v:x.total}));
+  barChart(document.getElementById('topChart'), top, topN);
 
   barChart(document.getElementById('typeChart'), [
     {n:'Phẫu thuật', v:res.totalPT},
