@@ -386,7 +386,31 @@
         </div>
         <div class="col" style="flex:0; align-self:end;"><button class="btn secondary small" id="btnExportExcel2" type="button">⬇ Xuất Excel</button></div>
         <div class="col" style="flex:0; align-self:end;"><button class="btn secondary small" id="btnExportWord2" type="button">⬇ Xuất Word</button></div>
-        <div class="col" style="flex:0; align-self:end;"><button class="btn secondary small" id="btnExportZalo" type="button">⬇ Xuất gọn (gửi Zalo)</button></div>
+      </div>
+
+      <div class="row" style="align-items:center; margin-top:4px; padding:10px; background:var(--paper2); border-radius:6px;">
+        <div class="col" style="max-width:230px;">
+          <label>Bảng gọn (Zalo) — chọn thời gian theo</label>
+          <select id="zaloTimeMode">
+            <option value="range">Từ ngày – Đến ngày (ở trên)</option>
+            <option value="month">1 tháng cụ thể</option>
+            <option value="monthrange">Khoảng tháng (có trung bình/tháng)</option>
+          </select>
+        </div>
+        <div class="col zalo-month-only" style="max-width:180px; display:none;">
+          <label>Tháng</label>
+          <input type="month" id="zaloMonth">
+        </div>
+        <div class="col zalo-monthrange-only" style="max-width:180px; display:none;">
+          <label>Từ tháng</label>
+          <input type="month" id="zaloMonthFrom">
+        </div>
+        <div class="col zalo-monthrange-only" style="max-width:180px; display:none;">
+          <label>Đến tháng</label>
+          <input type="month" id="zaloMonthTo">
+        </div>
+        <div class="col" style="flex:0; align-self:end;"><button class="btn secondary small" id="btnExportZaloExcel" type="button">⬇ Xuất Excel gọn (Zalo)</button></div>
+        <div class="col" style="flex:0; align-self:end;"><button class="btn secondary small" id="btnExportZaloWord" type="button">⬇ Xuất Word gọn (Zalo)</button></div>
       </div>
       <div style="overflow:auto;"><table class="data" id="summaryTable">
         <thead><tr><th>STT</th><th>Họ tên</th><th class="num gmdc-col">Tiền Gây mê (GM)</th><th class="num gmdc-col">Tiền Dụng cụ (DC)</th><th class="num">Tổng tiền (chưa trừ %)</th><th class="num">Tổng tiền (đã trừ %)</th></tr></thead>
@@ -1552,7 +1576,10 @@ function setupSummaryHandlers(){
   document.getElementById('btnExportWord2').addEventListener('click', exportWord);
   document.getElementById('exportGroupMode').addEventListener('change', e=>{ document.getElementById('exportGroupMode2').value = e.target.value; });
   document.getElementById('exportGroupMode2').addEventListener('change', e=>{ document.getElementById('exportGroupMode').value = e.target.value; });
-  document.getElementById('btnExportZalo').addEventListener('click', exportZaloStyle);
+  document.getElementById('btnExportZaloExcel').addEventListener('click', exportZaloExcel);
+  document.getElementById('btnExportZaloWord').addEventListener('click', exportZaloWord);
+  document.getElementById('zaloTimeMode').addEventListener('change', toggleZaloTimeInputs);
+  toggleZaloTimeInputs();
   document.getElementById('coc1Search').addEventListener('input', ()=>applyPickFilter('coc1Pick','coc1Search','coc1OnlySelected','coc1CountInfo'));
   document.getElementById('hcpmSearch').addEventListener('input', ()=>applyPickFilter('hcpmPick','hcpmSearch','hcpmOnlySelected','hcpmCountInfo'));
   document.getElementById('coc1OnlySelected').addEventListener('change', ()=>applyPickFilter('coc1Pick','coc1Search','coc1OnlySelected','coc1CountInfo'));
@@ -1778,7 +1805,7 @@ function exportExcel(){
   const wsData = [
     ['SỞ Y TẾ TỈNH GIA LAI'],
     ['BỆNH VIỆN ĐA KHOA TRUNG TÂM'],
-    [`BẢNG TỔNG HỢP BỒI DƯỠNG PHẪU THUẬT - THỦ THUẬT (${from} đến ${to})`],
+    [`BẢNG TỔNG HỢP BỒI DƯỠNG PHẪU THUẬT - THỦ THUẬT (Từ ${formatDateVN(from)} đến ${formatDateVN(to)})`],
     [],
     header
   ];
@@ -1813,42 +1840,179 @@ function rankWithTies(sortedDescList, valueKey){
   return ranks;
 }
 
-function exportZaloStyle(){
-  if(!CURRENT_SUMMARY){ toast('Hãy tính bảng tổng hợp trước.'); return; }
-  const from = document.getElementById('sumFrom').value, to = document.getElementById('sumTo').value;
-  const gmList = CURRENT_SUMMARY.list.filter(r=>r.gm>0).map(r=>({name:r.name, total:r.gm, con:Math.round(r.gm*(1-CONFIG.deductPct/100))})).sort((a,b)=>b.total-a.total);
-  const dcList = CURRENT_SUMMARY.list.filter(r=>r.dc>0).map(r=>({name:r.name, total:r.dc, con:Math.round(r.dc*(1-CONFIG.deductPct/100))})).sort((a,b)=>b.total-a.total);
-  const gmRanks = rankWithTies(gmList, 'total');
-  const dcRanks = rankWithTies(dcList, 'total');
+function formatDateVN(iso){
+  if(!iso) return '?';
+  const [y,m,d] = iso.split('-');
+  if(!y||!m||!d) return iso;
+  return `${d}/${m}/${y}`;
+}
 
+// Rút gọn tên: lấy từ cuối cùng, viết hoa; nếu trùng trong cùng danh sách thì lấy thêm từ liền trước để phân biệt
+function shortenNames(list){
+  const lastTwo = (name,n)=>{
+    const words = name.trim().split(/\s+/);
+    return words.slice(-n).join(' ').toUpperCase();
+  };
+  list.forEach(item=> item.shortName = lastTwo(item.name,1));
+  const groups = {};
+  list.forEach(item=> (groups[item.shortName]=groups[item.shortName]||[]).push(item));
+  Object.values(groups).forEach(group=>{
+    if(group.length<2) return;
+    group.forEach(item=>{
+      const words = item.name.trim().split(/\s+/);
+      item.shortName = words.length>=2 ? lastTwo(item.name,2) : item.name.toUpperCase();
+    });
+    const groups2 = {};
+    group.forEach(item=> (groups2[item.shortName]=groups2[item.shortName]||[]).push(item));
+    Object.values(groups2).forEach(g2=>{
+      if(g2.length>1) g2.forEach(item=> item.shortName = item.name.toUpperCase());
+    });
+  });
+  return list;
+}
+
+function toggleZaloTimeInputs(){
+  const mode = document.getElementById('zaloTimeMode').value;
+  document.querySelectorAll('.zalo-month-only').forEach(el=> el.style.display = mode==='month'?'':'none');
+  document.querySelectorAll('.zalo-monthrange-only').forEach(el=> el.style.display = mode==='monthrange'?'':'none');
+}
+
+async function getZaloRangeAndSummary(){
+  const mode = document.getElementById('zaloTimeMode').value;
+  if(mode==='range'){
+    const from = document.getElementById('sumFrom').value, to = document.getElementById('sumTo').value;
+    if(!CURRENT_SUMMARY){ toast('Hãy bấm "Tính tổng hợp" ở trên trước.'); return null; }
+    return {res:CURRENT_SUMMARY, label:`Từ ${formatDateVN(from)} đến ${formatDateVN(to)}`, numMonths:1, from, to};
+  }
+  if(mode==='month'){
+    const m = document.getElementById('zaloMonth').value;
+    if(!m){ toast('Chọn tháng trước.'); return null; }
+    const [y,mo] = m.split('-').map(Number);
+    const from = `${y}-${String(mo).padStart(2,'0')}-01`;
+    const to = `${y}-${String(mo).padStart(2,'0')}-${String(new Date(y,mo,0).getDate()).padStart(2,'0')}`;
+    const batches = await loadBatchesInRange(from,to);
+    const res = computeEarningsFromBatches(batches, from, to);
+    return {res, label:`Tháng ${mo}/${y}`, numMonths:1, from, to};
+  }
+  // monthrange
+  const mf = document.getElementById('zaloMonthFrom').value, mt = document.getElementById('zaloMonthTo').value;
+  if(!mf || !mt){ toast('Chọn đủ Từ tháng và Đến tháng.'); return null; }
+  const [yf,mof] = mf.split('-').map(Number), [yt,mot] = mt.split('-').map(Number);
+  const from = `${yf}-${String(mof).padStart(2,'0')}-01`;
+  const to = `${yt}-${String(mot).padStart(2,'0')}-${String(new Date(yt,mot,0).getDate()).padStart(2,'0')}`;
+  let numMonths = (yt-yf)*12 + (mot-mof) + 1;
+  if(numMonths<1) numMonths=1;
+  const batches = await loadBatchesInRange(from,to);
+  const res = computeEarningsFromBatches(batches, from, to);
+  return {res, label:`Từ tháng ${mof}/${yf} đến tháng ${mot}/${yt} (${numMonths} tháng)`, numMonths, from, to};
+}
+
+function buildZaloLists(res, numMonths){
+  const gmList = res.list.filter(r=>r.gm>0).map(r=>({name:r.name, total:r.gm, con:Math.round(r.gm*(1-CONFIG.deductPct/100))})).sort((a,b)=>b.total-a.total);
+  const dcList = res.list.filter(r=>r.dc>0).map(r=>({name:r.name, total:r.dc, con:Math.round(r.dc*(1-CONFIG.deductPct/100))})).sort((a,b)=>b.total-a.total);
+  shortenNames(gmList); shortenNames(dcList);
+  gmList.forEach(x=> x.tb = Math.round(x.total/numMonths));
+  dcList.forEach(x=> x.tb = Math.round(x.total/numMonths));
+  return {gmList, dcList, gmRanks:rankWithTies(gmList,'total'), dcRanks:rankWithTies(dcList,'total')};
+}
+
+async function exportZaloExcel(){
+  const ctx = await getZaloRangeAndSummary();
+  if(!ctx) return;
+  const {gmList, dcList, gmRanks, dcRanks} = buildZaloLists(ctx.res, ctx.numMonths);
+  const showTB = ctx.numMonths>1;
   const maxRows = Math.max(gmList.length, dcList.length);
-  const title = `Từ ${from||'?'} đến ${to||'?'}`;
+  const headerL = showTB ? ['TÊN','TOTAL','CÒN','TB/THÁNG','HẠNG'] : ['TÊN','TOTAL','CÒN','HẠNG'];
+  const gap = [''];
+  const headerR = headerL;
   const wsData = [
-    [title, '', '', '', '', title, '', '', ''],
-    ['TÊN','TOTAL','CÒN','HẠNG','', 'TÊN','TOTAL','CÒN','HẠNG']
+    [ctx.label, ...Array(headerL.length-1).fill(''), '', ctx.label, ...Array(headerR.length-1).fill('')],
+    [...headerL, '', ...headerR]
   ];
   let sumGmTotal=0, sumGmCon=0, sumDcTotal=0, sumDcCon=0;
   for(let i=0;i<maxRows;i++){
     const g = gmList[i], d = dcList[i];
     if(g){ sumGmTotal+=g.total; sumGmCon+=g.con; }
     if(d){ sumDcTotal+=d.total; sumDcCon+=d.con; }
-    wsData.push([
-      g?g.name:'', g?g.total:'', g?g.con:'', g?gmRanks[i]:'', '',
-      d?d.name:'', d?d.total:'', d?d.con:'', d?dcRanks[i]:''
-    ]);
+    const rowL = g ? (showTB?[g.shortName,g.total,g.con,g.tb,gmRanks[i]]:[g.shortName,g.total,g.con,gmRanks[i]]) : Array(headerL.length).fill('');
+    const rowR = d ? (showTB?[d.shortName,d.total,d.con,d.tb,dcRanks[i]]:[d.shortName,d.total,d.con,dcRanks[i]]) : Array(headerR.length).fill('');
+    wsData.push([...rowL, '', ...rowR]);
   }
-  wsData.push(['','','','','','','','','']);
-  wsData.push(['TỔNG', sumGmTotal, sumGmCon, '', '', 'TỔNG', sumDcTotal, sumDcCon, '']);
+  const totalRowL = showTB ? ['TỔNG', sumGmTotal, sumGmCon, Math.round(sumGmTotal/ctx.numMonths), ''] : ['TỔNG', sumGmTotal, sumGmCon, ''];
+  const totalRowR = showTB ? ['TỔNG', sumDcTotal, sumDcCon, Math.round(sumDcTotal/ctx.numMonths), ''] : ['TỔNG', sumDcTotal, sumDcCon, ''];
+  wsData.push([...totalRowL, '', ...totalRowR]);
 
   const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [{wch:16},{wch:13},{wch:13},{wch:7},{wch:3},{wch:16},{wch:13},{wch:13},{wch:7}];
+  const nCols = headerL.length;
+  const colWidths = [{wch:16},{wch:12},{wch:12}]; if(showTB) colWidths.push({wch:11}); colWidths.push({wch:7});
+  ws['!cols'] = [...colWidths, {wch:3}, ...colWidths];
   ws['!merges'] = [
-    {s:{r:0,c:0}, e:{r:0,c:3}}, {s:{r:0,c:5}, e:{r:0,c:8}}
+    {s:{r:0,c:0}, e:{r:0,c:nCols-1}}, {s:{r:0,c:nCols+1}, e:{r:0,c:nCols*2}}
   ];
+  // định dạng số có dấu chấm ngăn cách nghìn
+  for(let R=2; R<wsData.length; R++){
+    [1,2,3].forEach(offset=>{
+      [offset, offset+nCols+1].forEach(C=>{
+        const addr = XLSX.utils.encode_cell({r:R,c:C});
+        if(ws[addr] && typeof ws[addr].v === 'number') ws[addr].z = '#,##0';
+      });
+    });
+  }
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'GM-DC');
-  XLSX.writeFile(wb, `BoiDuong_GM_DC_${from}_${to}.xlsx`);
-  toast('Đã xuất file gọn — mở lên chụp ảnh hoặc gửi trực tiếp qua Zalo.');
+  XLSX.writeFile(wb, `BoiDuong_GM_DC_${ctx.from}_${ctx.to}.xlsx`);
+  toast('Đã xuất file Excel gọn — mở lên chụp ảnh hoặc gửi trực tiếp qua Zalo.');
+}
+
+async function exportZaloWord(){
+  const ctx = await getZaloRangeAndSummary();
+  if(!ctx) return;
+  const {gmList, dcList, gmRanks, dcRanks} = buildZaloLists(ctx.res, ctx.numMonths);
+  const showTB = ctx.numMonths>1;
+  const maxRows = Math.max(gmList.length, dcList.length);
+  const headerCells = showTB
+    ? '<th>TÊN</th><th>TOTAL</th><th>CÒN</th><th>TB/THÁNG</th><th>HẠNG</th>'
+    : '<th>TÊN</th><th>TOTAL</th><th>CÒN</th><th>HẠNG</th>';
+  let sumGmTotal=0, sumGmCon=0, sumDcTotal=0, sumDcCon=0;
+  for(let i=0;i<maxRows;i++){
+    const g = gmList[i], d = dcList[i];
+    if(g){ sumGmTotal+=g.total; sumGmCon+=g.con; }
+    if(d){ sumDcTotal+=d.total; sumDcCon+=d.con; }
+  }
+  // build two independent tables side by side using a wrapper table (simpler & reliable in Word)
+  const gmRowsHtml = gmList.map((g,i)=>`<tr><td>${g.shortName}</td><td align="right">${fmtNum(g.total)}</td><td align="right">${fmtNum(g.con)}</td>${showTB?`<td align="right">${fmtNum(g.tb)}</td>`:''}<td align="center">${gmRanks[i]}</td></tr>`).join('');
+  const dcRowsHtml = dcList.map((d,i)=>`<tr><td>${d.shortName}</td><td align="right">${fmtNum(d.total)}</td><td align="right">${fmtNum(d.con)}</td>${showTB?`<td align="right">${fmtNum(d.tb)}</td>`:''}<td align="center">${dcRanks[i]}</td></tr>`).join('');
+  const gmTotalRow = `<tr style="font-weight:bold;"><td>TỔNG</td><td align="right">${fmtNum(sumGmTotal)}</td><td align="right">${fmtNum(sumGmCon)}</td>${showTB?`<td align="right">${fmtNum(Math.round(sumGmTotal/ctx.numMonths))}</td>`:''}<td></td></tr>`;
+  const dcTotalRow = `<tr style="font-weight:bold;"><td>TỔNG</td><td align="right">${fmtNum(sumDcTotal)}</td><td align="right">${fmtNum(sumDcCon)}</td>${showTB?`<td align="right">${fmtNum(Math.round(sumDcTotal/ctx.numMonths))}</td>`:''}<td></td></tr>`;
+
+  const html = `
+  <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+  <head><meta charset="utf-8"><style>
+    body{font-family:"Times New Roman", serif; font-size:12pt;}
+    table{border-collapse:collapse;}
+    td,th{border:1px solid #000; padding:3px 6px;}
+    th{background:#dfe7ef; font-weight:bold;}
+    .wrap{width:100%;}
+    .wrap>tbody>tr>td{border:none; vertical-align:top; padding:0 8px 0 0;}
+    .center{text-align:center;}
+  </style></head>
+  <body>
+    <p class="center"><b>${ctx.label}</b></p>
+    <table class="wrap"><tr>
+      <td>
+        <table><tr>${headerCells}</tr>${gmRowsHtml}${gmTotalRow}</table>
+      </td>
+      <td>
+        <table><tr>${headerCells}</tr>${dcRowsHtml}${dcTotalRow}</table>
+      </td>
+    </tr></table>
+  </body></html>`;
+  const blob = new Blob(['\ufeff', html], {type:'application/msword'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `BoiDuong_GM_DC_${ctx.from}_${ctx.to}.doc`;
+  link.click();
+  toast('Đã xuất file Word gọn — mở lên chụp ảnh hoặc gửi trực tiếp qua Zalo.');
 }
 
 function exportWord(){
@@ -1877,7 +2041,7 @@ function exportWord(){
   </style></head>
   <body>
     <p class="center"><b>SỞ Y TẾ TỈNH GIA LAI</b><br><b>BỆNH VIỆN ĐA KHOA TRUNG TÂM</b></p>
-    <p class="center"><b>BẢNG TỔNG HỢP BỒI DƯỠNG PHẪU THUẬT – THỦ THUẬT</b><br>Từ ngày ${from} đến ngày ${to}</p>
+    <p class="center"><b>BẢNG TỔNG HỢP BỒI DƯỠNG PHẪU THUẬT – THỦ THUẬT</b><br>Từ ngày ${formatDateVN(from)} đến ngày ${formatDateVN(to)}</p>
     <table>
       ${headerRow}
       ${rowsHtml}
