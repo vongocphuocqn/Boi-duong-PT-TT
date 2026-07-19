@@ -301,8 +301,8 @@
             <option value="phu1">PTTT Phụ 1</option>
             <option value="phu2">PTTT Phụ 2</option>
             <option value="phu3">Gây mê Phụ</option>
-            <option value="phu4">Dụng cụ (cột 1, sát Gây mê Phụ)</option>
-            <option value="giup1">Dụng cụ / Người giúp việc</option>
+            <option value="phu4">Dụng cụ Vòng Trong (sát Gây mê Phụ)</option>
+            <option value="giup1">Dụng cụ Vòng Ngoài (giúp việc)</option>
           </select>
         </div>
         <input type="text" id="newExemptNote" placeholder="Ghi chú (tuỳ chọn)">
@@ -488,8 +488,8 @@ const ROLE_FIELDS = [
   {key:'phu1',     label:'PTTT Phụ 1'},
   {key:'phu2',     label:'PTTT Phụ 2'},
   {key:'phu3',     label:'Gây mê Phụ'},
-  {key:'phu4',     label:'Dụng cụ (cột 1, sát Gây mê Phụ)'},
-  {key:'giup1',    label:'Dụng cụ / Người giúp việc'},
+  {key:'phu4',     label:'Dụng cụ Vòng Trong (sát Gây mê Phụ)'},
+  {key:'giup1',    label:'Dụng cụ Vòng Ngoài (giúp việc)'},
 ];
 const DEFAULT_RATES = {
   PDB:{chinh:560000, phu:400000, giup:240000},
@@ -636,7 +636,7 @@ let CONFIG = {
   deductPct: 6,
   staffMaster: [],
   exemptRules: [
-    {maQD:'12', tiers:['P2','P3'], field:'phu4', note:'Không tính cột Dụng cụ (cột 1, sát Gây mê Phụ) khi Mã QĐ 12 và Loại II/III'},
+    {maQD:'12', tiers:['P2','P3'], field:'phu4', note:'Không tính cột Dụng cụ Vòng Trong (sát Gây mê Phụ) khi Mã QĐ 12 và Loại II/III'},
     {maQD:'14', tiers:[], field:'chinh2', note:'Không tính cột Gây mê Chính khi Mã QĐ 14 (liên quan phẫu thuật mắt)'}
   ],
   savedMappings: {}, // key: profile (vd 'da_hoan_thanh' / 'chua_hoan_thanh' / 'mac_dinh') -> mapping object
@@ -776,7 +776,7 @@ function migrateStaffConfig(){
     (CONFIG.exemptRules||[]).forEach(rule=>{
       if(rule.maQD==='12' && rule.field==='phu3'){
         rule.field = 'phu4';
-        rule.note = 'Không tính cột Dụng cụ (cột 1, sát Gây mê Phụ) khi Mã QĐ 12 và Loại II/III';
+        rule.note = 'Không tính cột Dụng cụ Vòng Trong (sát Gây mê Phụ) khi Mã QĐ 12 và Loại II/III';
       }
     });
     CONFIG.ruleVersion = 2;
@@ -1003,7 +1003,8 @@ function rebuildMapGrid(){
       const guesses = {
         caseId:['MÃ KCB','STT'], ngay:['NGÀY BĐ','NGÀY'], loaiP:['LOẠI P'], maQD:['MÃ QĐ','MA QD'],
         tenDV:['TÊN DỊCH VỤ'], chinh1:['PTTT CHÍNH'], chinh2:['GÂY MÊ CHÍNH','GÂY'],
-        phu1:['PTTT PHỤ 1'], phu2:['PTTT PHỤ 2'], phu3:['GÂY MÊ PHỤ'], giup1:['DỤNG CỤ']
+        phu1:['PTTT PHỤ 1'], phu2:['PTTT PHỤ 2'], phu3:['GÂY MÊ PHỤ'],
+        phu4:['VÒNG TRONG'], giup1:['VÒNG NGOÀI']
       };
       const cand = guesses[field]||[];
       for(const c of cand){
@@ -1185,7 +1186,7 @@ function renderProcRateTable(ratesOverride){
 
 const FIELD_LABELS = {
   chinh1:'PTTT Chính', chinh2:'Gây mê Chính', phu1:'PTTT Phụ 1', phu2:'PTTT Phụ 2',
-  phu3:'Gây mê Phụ', phu4:'Dụng cụ (cột 1, sát Gây mê Phụ)', giup1:'Dụng cụ / Người giúp việc'
+  phu3:'Gây mê Phụ', phu4:'Dụng cụ Vòng Trong (sát Gây mê Phụ)', giup1:'Dụng cụ Vòng Ngoài (giúp việc)'
 };
 const TIER_LABELS = {PDB:'ĐB', P1:'I', P2:'II', P3:'III'};
 
