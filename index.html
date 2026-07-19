@@ -366,15 +366,21 @@
     </div>
 
     <div class="card">
-      <h2>Bảng tổng hợp tiền bồi dưỡng cá nhân (sắp xếp giảm dần)</h2>
+      <h2>Bảng tổng hợp tiền bồi dưỡng cá nhân</h2>
       <div class="row" style="align-items:center; margin-bottom:6px;">
-        <label style="display:inline-flex; align-items:center; gap:6px; width:auto;">
-          <input type="checkbox" id="showGroupCols" style="width:auto;"> Hiện chi tiết theo nhóm Gây mê (GM) / Dụng cụ (DC)
-        </label>
+        <div class="col" style="max-width:260px;">
+          <label>Xem theo</label>
+          <select id="groupViewMode">
+            <option value="all">Tất cả (Gây mê + Dụng cụ)</option>
+            <option value="gm">Chỉ Gây mê (GM)</option>
+            <option value="dc">Chỉ Dụng cụ (DC)</option>
+          </select>
+        </div>
       </div>
       <div style="overflow:auto;"><table class="data" id="summaryTable">
-        <thead><tr><th>STT</th><th>Họ tên</th><th class="num gmdc-col" style="display:none;">Tiền Gây mê (GM)</th><th class="num gmdc-col" style="display:none;">Tiền Dụng cụ (DC)</th><th class="num">Tổng tiền (chưa trừ %)</th><th class="num">Tổng tiền (đã trừ %)</th></tr></thead>
+        <thead><tr><th>STT</th><th>Họ tên</th><th class="num gmdc-col">Tiền Gây mê (GM)</th><th class="num gmdc-col">Tiền Dụng cụ (DC)</th><th class="num">Tổng tiền (chưa trừ %)</th><th class="num">Tổng tiền (đã trừ %)</th></tr></thead>
         <tbody></tbody>
+        <tfoot></tfoot>
       </table></div>
     </div>
 
@@ -1508,7 +1514,7 @@ function setupSummaryHandlers(){
   document.getElementById('hcpmSearch').addEventListener('input', ()=>applyPickFilter('hcpmPick','hcpmSearch','hcpmOnlySelected','hcpmCountInfo'));
   document.getElementById('coc1OnlySelected').addEventListener('change', ()=>applyPickFilter('coc1Pick','coc1Search','coc1OnlySelected','coc1CountInfo'));
   document.getElementById('hcpmOnlySelected').addEventListener('change', ()=>applyPickFilter('hcpmPick','hcpmSearch','hcpmOnlySelected','hcpmCountInfo'));
-  document.getElementById('showGroupCols').addEventListener('change', syncGroupColsVisibility);
+  document.getElementById('groupViewMode').addEventListener('change', applyGroupViewMode);
 }
 
 async function runSummary(){
@@ -1572,20 +1578,44 @@ function renderKpis(res){
 }
 
 function renderSummaryTable(res){
-  const tb = document.querySelector('#summaryTable tbody');
-  tb.innerHTML='';
-  res.list.forEach((r,i)=>{
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${i+1}</td><td>${r.name}</td><td class="num gmdc-col" style="display:none;">${fmtNum(r.gm)}</td><td class="num gmdc-col" style="display:none;">${fmtNum(r.dc)}</td><td class="num">${fmtNum(r.total)}</td><td class="num">${fmtNum(r.afterDeduct)}</td>`;
-    tb.appendChild(tr);
-  });
-  syncGroupColsVisibility();
+  CURRENT_SUMMARY_CACHE_FOR_VIEW = res;
+  applyGroupViewMode();
 }
 
-function syncGroupColsVisibility(){
-  const show = document.getElementById('showGroupCols').checked;
-  document.querySelectorAll('#summaryTable .gmdc-col').forEach(el=> el.style.display = show ? '' : 'none');
+function applyGroupViewMode(){
+  const res = CURRENT_SUMMARY_CACHE_FOR_VIEW;
+  if(!res) return;
+  const mode = document.getElementById('groupViewMode').value; // all | gm | dc
+  const tb = document.querySelector('#summaryTable tbody');
+  const tf = document.querySelector('#summaryTable tfoot');
+  tb.innerHTML=''; tf.innerHTML='';
+
+  // hiện/ẩn 2 cột GM/DC theo chế độ
+  document.querySelectorAll('#summaryTable .gmdc-col').forEach(el=> el.style.display = (mode==='all') ? '' : 'none');
+
+  let rows = res.list.slice();
+  if(mode==='gm'){ rows = rows.filter(r=>r.gm>0).sort((a,b)=>b.gm-a.gm); }
+  else if(mode==='dc'){ rows = rows.filter(r=>r.dc>0).sort((a,b)=>b.dc-a.dc); }
+  // mode 'all' giữ nguyên thứ tự res.list (đã sắp xếp theo tổng giảm dần)
+
+  let sumGm=0, sumDc=0, sumTotal=0, sumAfter=0;
+  rows.forEach((r,i)=>{
+    sumGm+=r.gm; sumDc+=r.dc; sumTotal+=r.total; sumAfter+=r.afterDeduct;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i+1}</td><td>${r.name}</td><td class="num gmdc-col" style="${mode==='all'?'':'display:none;'}">${fmtNum(r.gm)}</td><td class="num gmdc-col" style="${mode==='all'?'':'display:none;'}">${fmtNum(r.dc)}</td><td class="num">${fmtNum(r.total)}</td><td class="num">${fmtNum(r.afterDeduct)}</td>`;
+    tb.appendChild(tr);
+  });
+
+  const trFoot = document.createElement('tr');
+  trFoot.style.fontWeight='bold';
+  trFoot.innerHTML = `<td colspan="2" style="background:var(--paper2);">TỔNG CỘNG (${rows.length} người)</td>
+    <td class="num gmdc-col" style="background:var(--paper2); ${mode==='all'?'':'display:none;'}">${fmtNum(sumGm)}</td>
+    <td class="num gmdc-col" style="background:var(--paper2); ${mode==='all'?'':'display:none;'}">${fmtNum(sumDc)}</td>
+    <td class="num" style="background:var(--paper2);">${fmtNum(sumTotal)}</td>
+    <td class="num" style="background:var(--paper2);">${fmtNum(sumAfter)}</td>`;
+  tf.appendChild(trFoot);
 }
+let CURRENT_SUMMARY_CACHE_FOR_VIEW = null;
 
 function renderNotInRosterTable(res){
   const tb = document.querySelector('#notInRosterTable tbody');
@@ -1612,8 +1642,8 @@ function renderGtPickLists(){
     hp.innerHTML = c1.innerHTML;
     return;
   }
-  c1.innerHTML = all.map(s=>`<label data-name="${s.name.toLowerCase()}"><input type="checkbox" class="c1chk" value="${s.name}" ${s.coc1?'checked':''}> ${s.name}</label>`).join('');
-  hp.innerHTML = all.map(s=>`<label data-name="${s.name.toLowerCase()}"><input type="checkbox" class="hpchk" value="${s.name}" ${s.hcpm?'checked':''}> ${s.name}</label>`).join('');
+  c1.innerHTML = all.map((s,i)=>`<label data-name="${s.name.toLowerCase()}"><input type="checkbox" class="c1chk" value="${s.name}" ${s.coc1?'checked':''}> <span class="muted" style="min-width:24px; display:inline-block;">${i+1}.</span> ${s.name}</label>`).join('');
+  hp.innerHTML = all.map((s,i)=>`<label data-name="${s.name.toLowerCase()}"><input type="checkbox" class="hpchk" value="${s.name}" ${s.hcpm?'checked':''}> <span class="muted" style="min-width:24px; display:inline-block;">${i+1}.</span> ${s.name}</label>`).join('');
   c1.querySelectorAll('input[type=checkbox]').forEach(cb=> cb.addEventListener('change', ()=>applyPickFilter('coc1Pick','coc1Search','coc1OnlySelected','coc1CountInfo')));
   hp.querySelectorAll('input[type=checkbox]').forEach(cb=> cb.addEventListener('change', ()=>applyPickFilter('hcpmPick','hcpmSearch','hcpmOnlySelected','hcpmCountInfo')));
   applyPickFilter('coc1Pick','coc1Search','coc1OnlySelected','coc1CountInfo');
