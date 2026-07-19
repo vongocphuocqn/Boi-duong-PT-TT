@@ -365,8 +365,9 @@
       <div id="batchesUsedInfo" class="muted" style="font-size:13px; padding:6px 0;"></div>
     </div>
 
-    <div class="card">
-      <h2>Bảng tổng hợp tiền bồi dưỡng cá nhân</h2>
+    <details class="card" open>
+      <summary>Bảng tổng hợp tiền bồi dưỡng cá nhân</summary>
+      <div class="card-body">
       <div class="row" style="align-items:center; margin-bottom:6px;">
         <div class="col" style="max-width:260px;">
           <label>Xem theo</label>
@@ -382,19 +383,23 @@
         <tbody></tbody>
         <tfoot></tfoot>
       </table></div>
-    </div>
+      </div>
+    </details>
 
-    <div class="card">
-      <h2>Danh sách tên không có trong danh mục Khoa (không được tính tiền)</h2>
+    <details class="card">
+      <summary>Danh sách tên không có trong danh mục Khoa (không được tính tiền)</summary>
+      <div class="card-body">
       <p class="muted">Những tên xuất hiện trong dữ liệu HIS nhưng <b>không khớp</b> với ai trong danh mục nhân viên Khoa (tab Danh mục &amp; đơn giá) sẽ <b>không được tính tiền</b> — thường là bác sĩ phẫu thuật khoa khác (đúng theo cách tính chỉ trả cho nhân viên Khoa GMHS). Nếu thấy tên quen thuộc của Khoa bị liệt vào đây, có thể do sai chính tả/viết tắt khác — vào tab Danh mục kiểm tra và sửa lại tên cho khớp.</p>
       <div style="overflow:auto;"><table class="data" id="notInRosterTable">
         <thead><tr><th>Mã ca</th><th>Ngày</th><th>Họ tên (theo dữ liệu HIS)</th><th>Vai trò</th><th class="num">Số tiền (không tính)</th></tr></thead>
         <tbody></tbody>
       </table></div>
-    </div>
+      </div>
+    </details>
 
-    <div class="card">
-      <h2>Bảng chi bộ phận gián tiếp</h2>
+    <details class="card" open>
+      <summary>Bảng chi bộ phận gián tiếp</summary>
+      <div class="card-body">
       <div id="giantiepSelectHint" class="muted" style="margin-bottom:8px;">Tick chọn nhân viên áp dụng cho từng nhóm trong đợt tính này (mặc định lấy theo danh mục cấu hình).</div>
       <div class="row">
         <div class="col"><h3>Cọc 1 (chọn để tính Điều dưỡng trưởng)</h3>
@@ -423,52 +428,61 @@
         <thead><tr><th>Chức danh / Nhân viên</th><th class="num">Số tiền được hưởng</th><th>Ghi chú</th></tr></thead>
         <tbody></tbody>
       </table>
-    </div>
+      </div>
+    </details>
 
-    <div class="card">
-      <h2>Danh sách nhân viên không được tính tiền (theo quy tắc miễn trừ)</h2>
+    <details class="card">
+      <summary>Danh sách nhân viên không được tính tiền (theo quy tắc miễn trừ)</summary>
+      <div class="card-body">
       <p class="muted">Các trường hợp trong khoảng ngày đã chọn bị loại khỏi tính tiền do khớp quy tắc miễn trừ Mã QĐ (xem/sửa quy tắc ở tab Danh mục &amp; đơn giá).</p>
       <div style="overflow:auto;"><table class="data" id="exemptionCasesTable">
         <thead><tr><th>Mã ca</th><th>Ngày</th><th>Họ tên</th><th>Cột không tính</th><th>Mã QĐ</th><th>Loại</th></tr></thead>
         <tbody></tbody>
       </table></div>
-    </div>
+      </div>
+    </details>
   </section>
 
   <!-- ===================== TAB 4: STATS ===================== -->
   <section class="tab" id="tab-stats">
-    <div class="card">
-      <h2>Top 10 nhân viên có tổng thu nhập cao nhất</h2>
-      <div id="topChart"></div>
-    </div>
+    <details class="card" open>
+      <summary>Top 10 nhân viên có tổng thu nhập cao nhất</summary>
+      <div class="card-body"><div id="topChart"></div></div>
+    </details>
     <div class="row">
-      <div class="col card">
-        <h2>Tổng tiền theo Loại ca (Phẫu thuật / Thủ thuật)</h2>
-        <div id="typeChart"></div>
-      </div>
-      <div class="col card">
-        <h2>Số ca theo mức Loại P</h2>
-        <div id="loaipChart"></div>
-      </div>
+      <details class="col card" open>
+        <summary>Tổng tiền theo Loại ca (Phẫu thuật / Thủ thuật)</summary>
+        <div class="card-body"><div id="typeChart"></div></div>
+      </details>
+      <details class="col card" open>
+        <summary>Số ca theo mức Loại P</summary>
+        <div class="card-body"><div id="loaipChart"></div></div>
+      </details>
     </div>
-    <div class="card">
-      <h2>Xu hướng theo từng đợt nhập dữ liệu</h2>
-      <div id="trendChart"></div>
-    </div>
+    <details class="card" open>
+      <summary>Xu hướng theo từng đợt nhập dữ liệu</summary>
+      <div class="card-body"><div id="trendChart"></div></div>
+    </details>
 
-    <div class="card">
-      <h2>Tổng thu theo tháng (tính trên toàn bộ dữ liệu đã lưu)</h2>
-      <p class="muted">Số liệu tổng thu chưa trừ % khấu trừ, gộp theo tháng từ tất cả các đợt đã nhập.</p>
+    <details class="card" open>
+      <summary>Tổng thu theo tháng</summary>
+      <div class="card-body">
+      <p class="muted">Số liệu tổng thu chưa trừ % khấu trừ, chỉ tính nhân viên có trong danh mục Khoa, gộp theo tháng.</p>
       <div class="toolbar">
+        <div class="col" style="max-width:200px;"><label>Từ ngày</label><input type="date" id="monthlyFrom"></div>
+        <div class="col" style="max-width:200px;"><label>Đến ngày</label><input type="date" id="monthlyTo"></div>
         <div class="col" style="max-width:280px;">
           <label>Chọn nhân viên</label>
           <select id="monthlyStaffSelect"><option value="">— Tất cả nhân viên (tổng khoa) —</option></select>
         </div>
+        <div class="col" style="flex:0;"><button class="btn secondary small" id="btnMonthlyExport" type="button">⬇ Xuất Excel</button></div>
       </div>
       <div class="kpis" id="monthlyKpi"></div>
       <div id="monthlyChart"></div>
-    </div>
+      </div>
+    </details>
   </section>
+
 </div>
 
 <div class="toast" id="toast"></div>
@@ -737,6 +751,9 @@ async function init(){
   setupConfigHandlers();
   setupSummaryHandlers();
   document.getElementById('monthlyStaffSelect').addEventListener('change', renderMonthlyChart);
+  document.getElementById('monthlyFrom').addEventListener('change', renderMonthlyStats);
+  document.getElementById('monthlyTo').addEventListener('change', renderMonthlyStats);
+  document.getElementById('btnMonthlyExport').addEventListener('click', exportMonthlyExcel);
   // default date range = this month
   const now = new Date();
   const first = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1645,8 +1662,18 @@ function renderGtPickLists(){
   }
   c1.innerHTML = all.map((s,i)=>`<label data-name="${s.name.toLowerCase()}"><input type="checkbox" class="c1chk" value="${s.name}" ${s.coc1?'checked':''}> <span class="muted" style="min-width:24px; display:inline-block;">${i+1}.</span> ${s.name}</label>`).join('');
   hp.innerHTML = all.map((s,i)=>`<label data-name="${s.name.toLowerCase()}"><input type="checkbox" class="hpchk" value="${s.name}" ${s.hcpm?'checked':''}> <span class="muted" style="min-width:24px; display:inline-block;">${i+1}.</span> ${s.name}</label>`).join('');
-  c1.querySelectorAll('input[type=checkbox]').forEach(cb=> cb.addEventListener('change', ()=>applyPickFilter('coc1Pick','coc1Search','coc1OnlySelected','coc1CountInfo')));
-  hp.querySelectorAll('input[type=checkbox]').forEach(cb=> cb.addEventListener('change', ()=>applyPickFilter('hcpmPick','hcpmSearch','hcpmOnlySelected','hcpmCountInfo')));
+  c1.querySelectorAll('input[type=checkbox]').forEach(cb=> cb.addEventListener('change', async ()=>{
+    applyPickFilter('coc1Pick','coc1Search','coc1OnlySelected','coc1CountInfo');
+    const s = CONFIG.staffMaster.find(x=>x.name===cb.value);
+    if(s){ s.coc1 = cb.checked; await sSet('config:main', CONFIG); }
+    computeGT();
+  }));
+  hp.querySelectorAll('input[type=checkbox]').forEach(cb=> cb.addEventListener('change', async ()=>{
+    applyPickFilter('hcpmPick','hcpmSearch','hcpmOnlySelected','hcpmCountInfo');
+    const s = CONFIG.staffMaster.find(x=>x.name===cb.value);
+    if(s){ s.hcpm = cb.checked; await sSet('config:main', CONFIG); }
+    computeGT();
+  }));
   applyPickFilter('coc1Pick','coc1Search','coc1OnlySelected','coc1CountInfo');
   applyPickFilter('hcpmPick','hcpmSearch','hcpmOnlySelected','hcpmCountInfo');
 }
@@ -1820,18 +1847,23 @@ function barChart(container, data, maxItems, colorVar){
 
 let MONTHLY_CACHE = null;
 
-async function computeMonthlyBreakdown(){
+async function computeMonthlyBreakdown(fromStr, toStr){
   const allBatches = [];
   for(const meta of BATCH_INDEX){
     const b = await sGet('batch:'+meta.id);
     if(b) allBatches.push(b);
   }
+  const rosterNames = new Set(CONFIG.staffMaster.map(s=>s.name.trim().toLowerCase()));
+  const fromD = fromStr? new Date(fromStr): null;
+  const toD = toStr? new Date(toStr): null;
   const perStaffMonth = {}; // name -> {month: amount}
   const totalMonth = {}; // 'YYYY-MM' -> amount
   allBatches.forEach(batch=>{
     batch.rows.forEach(r=>{
       const d = parseVNDate(r.ngay);
       if(!d) return;
+      if(fromD && d<fromD) return;
+      if(toD && d>toD) return;
       const month = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
       const cChinh = rateFor(r.loaiP,'chinh'), cPhu = rateFor(r.loaiP,'phu'), cGiup = rateFor(r.loaiP,'giup');
       const excluded = excludedFieldsForRow(r);
@@ -1839,6 +1871,7 @@ async function computeMonthlyBreakdown(){
       entries.forEach(([key,name,rate])=>{
         if(!name || excluded.has(key)) return;
         name = name.trim(); if(!name) return;
+        if(!rosterNames.has(name.toLowerCase())) return; // chỉ tính nhân viên có trong danh mục Khoa
         perStaffMonth[name] = perStaffMonth[name]||{};
         perStaffMonth[name][month] = (perStaffMonth[name][month]||0)+rate;
         totalMonth[month] = (totalMonth[month]||0)+rate;
@@ -1865,13 +1898,43 @@ function renderMonthlyChart(){
 }
 
 async function renderMonthlyStats(){
-  MONTHLY_CACHE = await computeMonthlyBreakdown();
+  const from = document.getElementById('monthlyFrom').value;
+  const to = document.getElementById('monthlyTo').value;
+  MONTHLY_CACHE = await computeMonthlyBreakdown(from, to);
   const sel = document.getElementById('monthlyStaffSelect');
   const prevVal = sel.value;
   const names = Object.keys(MONTHLY_CACHE.perStaffMonth).sort((a,b)=>a.localeCompare(b,'vi'));
   sel.innerHTML = '<option value="">— Tất cả nhân viên (tổng khoa) —</option>' + names.map(n=>`<option value="${n}">${n}</option>`).join('');
   sel.value = names.includes(prevVal) ? prevVal : '';
   renderMonthlyChart();
+}
+
+function exportMonthlyExcel(){
+  if(!MONTHLY_CACHE){ toast('Chưa có dữ liệu để xuất.'); return; }
+  const from = document.getElementById('monthlyFrom').value || '(không giới hạn)';
+  const to = document.getElementById('monthlyTo').value || '(không giới hạn)';
+  const allMonths = new Set();
+  Object.values(MONTHLY_CACHE.perStaffMonth).forEach(m=>Object.keys(m).forEach(k=>allMonths.add(k)));
+  const months = Array.from(allMonths).sort();
+  const wsData = [
+    ['SỞ Y TẾ TỈNH GIA LAI'],['BỆNH VIỆN ĐA KHOA TRUNG TÂM'],
+    [`TỔNG THU THEO THÁNG THEO NHÂN VIÊN (Từ ${from} đến ${to})`],[],
+    ['Họ tên', ...months, 'Tổng cộng', 'Trung bình/tháng']
+  ];
+  const names = Object.keys(MONTHLY_CACHE.perStaffMonth).sort((a,b)=>a.localeCompare(b,'vi'));
+  names.forEach(name=>{
+    const m = MONTHLY_CACHE.perStaffMonth[name];
+    const vals = months.map(mo=>m[mo]||0);
+    const total = vals.reduce((a,b)=>a+b,0);
+    const monthsWithData = months.filter(mo=>m[mo]).length || 1;
+    wsData.push([name, ...vals, total, Math.round(total/monthsWithData)]);
+  });
+  wsData.push(['TỔNG KHOA', ...months.map(mo=>MONTHLY_CACHE.totalMonth[mo]||0)]);
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Tong thu theo thang');
+  XLSX.writeFile(wb, `TongThuTheoThang_${from}_${to}.xlsx`);
+  toast('Đã xuất file Excel.');
 }
 
 async function renderStats(){
