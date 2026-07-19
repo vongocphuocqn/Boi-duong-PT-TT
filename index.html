@@ -377,6 +377,15 @@
             <option value="dc">Chỉ Dụng cụ (DC)</option>
           </select>
         </div>
+        <div class="col" style="max-width:220px;">
+          <label>Khi xuất file</label>
+          <select id="exportGroupMode2">
+            <option value="total">Chỉ tổng cộng</option>
+            <option value="detail">Chi tiết theo nhóm GM/DC</option>
+          </select>
+        </div>
+        <div class="col" style="flex:0; align-self:end;"><button class="btn secondary small" id="btnExportExcel2" type="button">⬇ Xuất Excel</button></div>
+        <div class="col" style="flex:0; align-self:end;"><button class="btn secondary small" id="btnExportWord2" type="button">⬇ Xuất Word</button></div>
       </div>
       <div style="overflow:auto;"><table class="data" id="summaryTable">
         <thead><tr><th>STT</th><th>Họ tên</th><th class="num gmdc-col">Tiền Gây mê (GM)</th><th class="num gmdc-col">Tiền Dụng cụ (DC)</th><th class="num">Tổng tiền (chưa trừ %)</th><th class="num">Tổng tiền (đã trừ %)</th></tr></thead>
@@ -445,6 +454,15 @@
 
   <!-- ===================== TAB 4: STATS ===================== -->
   <section class="tab" id="tab-stats">
+    <div class="card">
+      <h2>Chọn khoảng thời gian thống kê</h2>
+      <p class="muted">Áp dụng cho các biểu đồ bên dưới (Top 10, Loại ca, Loại P, Xu hướng theo đợt) — độc lập với khoảng ngày ở tab "Bảng tổng hợp". Để trống = lấy toàn bộ dữ liệu đã lưu.</p>
+      <div class="toolbar">
+        <div class="col"><label>Từ ngày</label><input type="date" id="statsFrom"></div>
+        <div class="col"><label>Đến ngày</label><input type="date" id="statsTo"></div>
+        <div class="col" style="flex:0;"><button class="btn" id="btnStatsCompute">⟳ Tính thống kê</button></div>
+      </div>
+    </div>
     <details class="card" open>
       <summary>Top 10 nhân viên có tổng thu nhập cao nhất</summary>
       <div class="card-body"><div id="topChart"></div></div>
@@ -754,6 +772,7 @@ async function init(){
   document.getElementById('monthlyFrom').addEventListener('change', renderMonthlyStats);
   document.getElementById('monthlyTo').addEventListener('change', renderMonthlyStats);
   document.getElementById('btnMonthlyExport').addEventListener('click', exportMonthlyExcel);
+  document.getElementById('btnStatsCompute').addEventListener('click', computeStatsRange);
   // default date range = this month
   const now = new Date();
   const first = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1528,6 +1547,10 @@ function setupSummaryHandlers(){
   document.getElementById('btnRecalcGT').addEventListener('click', computeGT);
   document.getElementById('btnExportExcel').addEventListener('click', exportExcel);
   document.getElementById('btnExportWord').addEventListener('click', exportWord);
+  document.getElementById('btnExportExcel2').addEventListener('click', exportExcel);
+  document.getElementById('btnExportWord2').addEventListener('click', exportWord);
+  document.getElementById('exportGroupMode').addEventListener('change', e=>{ document.getElementById('exportGroupMode2').value = e.target.value; });
+  document.getElementById('exportGroupMode2').addEventListener('change', e=>{ document.getElementById('exportGroupMode').value = e.target.value; });
   document.getElementById('coc1Search').addEventListener('input', ()=>applyPickFilter('coc1Pick','coc1Search','coc1OnlySelected','coc1CountInfo'));
   document.getElementById('hcpmSearch').addEventListener('input', ()=>applyPickFilter('hcpmPick','hcpmSearch','hcpmOnlySelected','hcpmCountInfo'));
   document.getElementById('coc1OnlySelected').addEventListener('change', ()=>applyPickFilter('coc1Pick','coc1Search','coc1OnlySelected','coc1CountInfo'));
@@ -1937,32 +1960,47 @@ function exportMonthlyExcel(){
   toast('Đã xuất file Excel.');
 }
 
-async function renderStats(){
-  await renderMonthlyStats();
-  if(!CURRENT_SUMMARY){
-    document.getElementById('topChart').innerHTML = '<p class="muted">Hãy tính bảng tổng hợp ở tab "Bảng tổng hợp" trước.</p>';
+let STATS_SUMMARY = null;
+
+async function computeStatsRange(){
+  const from = document.getElementById('statsFrom').value;
+  const to = document.getElementById('statsTo').value;
+  const batches = await loadBatchesInRange(from, to);
+  STATS_SUMMARY = computeEarningsFromBatches(batches, from, to);
+  renderStatsCharts();
+}
+
+function renderStatsCharts(){
+  const res = STATS_SUMMARY;
+  if(!res || !res.list.length){
+    document.getElementById('topChart').innerHTML = '<p class="muted">Không có dữ liệu trong khoảng thời gian này — kiểm tra lại đã nhập dữ liệu chưa, hoặc mở rộng khoảng ngày.</p>';
     document.getElementById('typeChart').innerHTML='';
     document.getElementById('loaipChart').innerHTML='';
     document.getElementById('trendChart').innerHTML='';
     return;
   }
-  const top = CURRENT_SUMMARY.list.slice(0,10).map(x=>({n:x.name, v:x.total}));
+  const top = res.list.slice(0,10).map(x=>({n:x.name, v:x.total}));
   barChart(document.getElementById('topChart'), top, 10);
 
   barChart(document.getElementById('typeChart'), [
-    {n:'Phẫu thuật', v:CURRENT_SUMMARY.totalPT},
-    {n:'Thủ thuật', v:CURRENT_SUMMARY.totalTT}
+    {n:'Phẫu thuật', v:res.totalPT},
+    {n:'Thủ thuật', v:res.totalTT}
   ], 2);
 
-  const loaiPData = Object.keys(CURRENT_SUMMARY.loaiPCount).sort((a,b)=>CURRENT_SUMMARY.loaiPCount[b]-CURRENT_SUMMARY.loaiPCount[a])
-    .map(k=>({n:k, v:CURRENT_SUMMARY.loaiPCount[k]}));
+  const loaiPData = Object.keys(res.loaiPCount).sort((a,b)=>res.loaiPCount[b]-res.loaiPCount[a])
+    .map(k=>({n:k, v:res.loaiPCount[k]}));
   barChart(document.getElementById('loaipChart'), loaiPData, 10);
 
-  const trendData = Object.keys(CURRENT_SUMMARY.perBatchTotal).map(id=>{
+  const trendData = Object.keys(res.perBatchTotal).map(id=>{
     const meta = BATCH_INDEX.find(b=>b.id===id);
-    return {n: meta? (meta.note||meta.filename) : id, v: CURRENT_SUMMARY.perBatchTotal[id]};
+    return {n: meta? (meta.note||meta.filename) : id, v: res.perBatchTotal[id]};
   });
   barChart(document.getElementById('trendChart'), trendData, 20);
+}
+
+async function renderStats(){
+  await renderMonthlyStats();
+  await computeStatsRange();
 }
 
 init();
