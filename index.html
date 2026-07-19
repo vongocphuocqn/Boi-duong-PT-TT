@@ -424,6 +424,20 @@
       <summary>Danh sách tên không có trong danh mục Khoa (không được tính tiền)</summary>
       <div class="card-body">
       <p class="muted">Những tên xuất hiện trong dữ liệu HIS nhưng <b>không khớp</b> với ai trong danh mục nhân viên Khoa (tab Danh mục &amp; đơn giá) sẽ <b>không được tính tiền</b> — thường là bác sĩ phẫu thuật khoa khác (đúng theo cách tính chỉ trả cho nhân viên Khoa GMHS). Nếu thấy tên quen thuộc của Khoa bị liệt vào đây, có thể do sai chính tả/viết tắt khác — vào tab Danh mục kiểm tra và sửa lại tên cho khớp.</p>
+      <div class="toolbar">
+        <div class="col"><label>Từ ngày</label><input type="date" id="notInRosterFrom"></div>
+        <div class="col"><label>Đến ngày</label><input type="date" id="notInRosterTo"></div>
+        <div class="col" style="flex:0;"><button class="btn secondary small" id="btnNotInRosterCompute" type="button">⟳ Tính lại</button></div>
+        <div class="col"><label>Tìm tên</label><input type="text" id="notInRosterSearch" placeholder="Gõ để lọc..."></div>
+      </div>
+
+      <h3>Tổng thu nhập theo phẫu thuật viên (nếu tính, sắp xếp giảm dần)</h3>
+      <div style="overflow:auto;"><table class="data" id="notInRosterSummaryTable">
+        <thead><tr><th>STT</th><th>Họ tên</th><th class="num">Số ca</th><th class="num">Tổng tiền (nếu tính)</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+
+      <h3>Chi tiết từng ca</h3>
       <div style="overflow:auto;"><table class="data" id="notInRosterTable">
         <thead><tr><th>Mã ca</th><th>Ngày</th><th>Họ tên (theo dữ liệu HIS)</th><th>Vai trò</th><th class="num">Số tiền (không tính)</th></tr></thead>
         <tbody></tbody>
@@ -483,10 +497,20 @@
       <h2>Chọn khoảng thời gian thống kê</h2>
       <p class="muted">Áp dụng cho các biểu đồ bên dưới (Top 10, Loại ca, Loại P, Xu hướng theo đợt) — độc lập với khoảng ngày ở tab "Bảng tổng hợp". Để trống = lấy toàn bộ dữ liệu đã lưu.</p>
       <div class="toolbar">
-        <div class="col"><label>Từ ngày</label><input type="date" id="statsFrom"></div>
-        <div class="col"><label>Đến ngày</label><input type="date" id="statsTo"></div>
+        <div class="col" style="max-width:230px;">
+          <label>Chọn thời gian theo</label>
+          <select id="statsTimeMode">
+            <option value="range">Từ ngày – Đến ngày</option>
+            <option value="monthrange">Từ tháng – Đến tháng (có trung bình/tháng)</option>
+          </select>
+        </div>
+        <div class="col stats-range-only" style="max-width:200px;"><label>Từ ngày</label><input type="date" id="statsFrom"></div>
+        <div class="col stats-range-only" style="max-width:200px;"><label>Đến ngày</label><input type="date" id="statsTo"></div>
+        <div class="col stats-monthrange-only" style="max-width:180px; display:none;"><label>Từ tháng</label><input type="month" id="statsMonthFrom"></div>
+        <div class="col stats-monthrange-only" style="max-width:180px; display:none;"><label>Đến tháng</label><input type="month" id="statsMonthTo"></div>
         <div class="col" style="flex:0;"><button class="btn" id="btnStatsCompute">⟳ Tính thống kê</button></div>
       </div>
+      <div class="kpis" id="statsRangeKpi" style="display:none;"></div>
     </div>
     <details class="card" open>
       <summary>Thu nhập theo nhân viên (xếp giảm dần)</summary>
@@ -499,6 +523,13 @@
               <option value="20">Top 20</option>
               <option value="50">Top 50</option>
               <option value="all">Tất cả nhân viên</option>
+            </select>
+          </div>
+          <div class="col stats-monthrange-only" style="max-width:200px; display:none;">
+            <label>Xếp theo</label>
+            <select id="topValueMode">
+              <option value="total">Tổng cộng</option>
+              <option value="avg">Trung bình/tháng</option>
             </select>
           </div>
         </div>
@@ -812,6 +843,9 @@ async function init(){
   document.getElementById('btnMonthlyExport').addEventListener('click', exportMonthlyExcel);
   document.getElementById('btnStatsCompute').addEventListener('click', computeStatsRange);
   document.getElementById('topCount').addEventListener('change', renderStatsCharts);
+  document.getElementById('topValueMode').addEventListener('change', renderStatsCharts);
+  document.getElementById('statsTimeMode').addEventListener('change', toggleStatsTimeInputs);
+  toggleStatsTimeInputs();
   // default date range = this month
   const now = new Date();
   const first = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1584,6 +1618,8 @@ function parseVNDate(s){
 function setupSummaryHandlers(){
   document.getElementById('btnCompute').addEventListener('click', runSummary);
   document.getElementById('btnRecalcGT').addEventListener('click', computeGT);
+  document.getElementById('btnNotInRosterCompute').addEventListener('click', computeNotInRosterSection);
+  document.getElementById('notInRosterSearch').addEventListener('input', renderNotInRosterSection);
   document.getElementById('btnExportExcel').addEventListener('click', exportExcel);
   document.getElementById('btnExportWord').addEventListener('click', exportWord);
   document.getElementById('btnExportExcel2').addEventListener('click', exportExcel);
@@ -1613,7 +1649,10 @@ async function runSummary(){
   renderKpis(res);
   renderBatchesUsedInfo(batches);
   renderExemptionCasesTable(res);
-  renderNotInRosterTable(res);
+  document.getElementById('notInRosterFrom').value = from;
+  document.getElementById('notInRosterTo').value = to;
+  NOT_IN_ROSTER_CACHE = res;
+  renderNotInRosterSection();
   renderGtPickLists();
   computeGT();
   toast('Đã tính tổng hợp: '+res.list.length+' nhân viên, từ '+batches.length+' đợt dữ liệu.');
@@ -1701,20 +1740,49 @@ function applyGroupViewMode(){
 }
 let CURRENT_SUMMARY_CACHE_FOR_VIEW = null;
 
-function renderNotInRosterTable(res){
-  const tb = document.querySelector('#notInRosterTable tbody');
-  if(!tb) return;
-  tb.innerHTML='';
-  const rows = res.notInRoster||[];
-  if(!rows.length){
-    tb.innerHTML = '<tr><td colspan="5" class="muted">Không có trường hợp nào — mọi tên xuất hiện trong dữ liệu đều đã có trong danh mục Khoa.</td></tr>';
+let NOT_IN_ROSTER_CACHE = null;
+
+function formatCellDate(raw){
+  const d = parseVNDate(raw);
+  if(!d || isNaN(d)) return raw||'';
+  return formatDateVN(fmtDateInput(d));
+}
+
+async function computeNotInRosterSection(){
+  const from = document.getElementById('notInRosterFrom').value;
+  const to = document.getElementById('notInRosterTo').value;
+  const batches = await loadBatchesInRange(from, to);
+  NOT_IN_ROSTER_CACHE = computeEarningsFromBatches(batches, from, to);
+  renderNotInRosterSection();
+}
+
+function renderNotInRosterSection(){
+  const res = NOT_IN_ROSTER_CACHE;
+  const sumTb = document.querySelector('#notInRosterSummaryTable tbody');
+  const detailTb = document.querySelector('#notInRosterTable tbody');
+  if(!res){
+    sumTb.innerHTML = '<tr><td colspan="4" class="muted">Chưa tính — chọn khoảng ngày rồi bấm "Tính lại".</td></tr>';
+    detailTb.innerHTML = '<tr><td colspan="5" class="muted">Chưa tính — chọn khoảng ngày rồi bấm "Tính lại".</td></tr>';
     return;
   }
+  const search = (document.getElementById('notInRosterSearch').value||'').trim().toLowerCase();
+  const rows = (res.notInRoster||[]).filter(e=> !search || e.name.toLowerCase().includes(search));
+
+  const agg = {};
   rows.forEach(e=>{
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${e.caseId||''}</td><td>${e.ngay||''}</td><td>${e.name}</td><td>${FIELD_LABELS[e.field]||e.field}</td><td class="num">${fmtNum(e.amount)}</td>`;
-    tb.appendChild(tr);
+    if(!agg[e.name]) agg[e.name] = {count:0, total:0};
+    agg[e.name].count++;
+    agg[e.name].total += e.amount;
   });
+  const aggList = Object.keys(agg).map(name=>({name, count:agg[name].count, total:agg[name].total})).sort((a,b)=>b.total-a.total);
+
+  sumTb.innerHTML = aggList.length
+    ? aggList.map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td class="num">${a.count}</td><td class="num">${fmtNum(a.total)}</td></tr>`).join('')
+    : '<tr><td colspan="4" class="muted">Không có trường hợp nào.</td></tr>';
+
+  detailTb.innerHTML = rows.length
+    ? rows.map(e=>`<tr><td>${e.caseId||''}</td><td>${formatCellDate(e.ngay)}</td><td>${e.name}</td><td>${FIELD_LABELS[e.field]||e.field}</td><td class="num">${fmtNum(e.amount)}</td></tr>`).join('')
+    : '<tr><td colspan="5" class="muted">Không có trường hợp nào.</td></tr>';
 }
 
 function renderGtPickLists(){
@@ -2005,45 +2073,42 @@ async function exportZaloWord(){
   if(!ctx) return;
   const {gmList, dcList, gmRanks, dcRanks} = buildZaloLists(ctx.res, ctx.numMonths);
   const showTB = ctx.numMonths>1;
-  const maxRows = Math.max(gmList.length, dcList.length);
+  const nDataCols = showTB ? 5 : 4;
   const headerCells = showTB
     ? '<th>TÊN</th><th>TOTAL</th><th>CÒN</th><th>TB/THÁNG</th><th>HẠNG</th>'
     : '<th>TÊN</th><th>TOTAL</th><th>CÒN</th><th>HẠNG</th>';
   let sumGmTotal=0, sumGmCon=0, sumDcTotal=0, sumDcCon=0;
+  gmList.forEach(g=>{ sumGmTotal+=g.total; sumGmCon+=g.con; });
+  dcList.forEach(d=>{ sumDcTotal+=d.total; sumDcCon+=d.con; });
+
+  const cellsFor = (item, ranks, i)=> item
+    ? `<td>${item.shortName}</td><td align="right">${fmtNum(item.total)}</td><td align="right">${fmtNum(item.con)}</td>${showTB?`<td align="right">${fmtNum(item.tb)}</td>`:''}<td align="center">${ranks[i]}</td>`
+    : Array(nDataCols).fill('<td></td>').join('');
+
+  const maxRows = Math.max(gmList.length, dcList.length);
+  const bodyRows = [];
   for(let i=0;i<maxRows;i++){
-    const g = gmList[i], d = dcList[i];
-    if(g){ sumGmTotal+=g.total; sumGmCon+=g.con; }
-    if(d){ sumDcTotal+=d.total; sumDcCon+=d.con; }
+    bodyRows.push(`<tr>${cellsFor(gmList[i],gmRanks,i)}<td class="gap"></td>${cellsFor(dcList[i],dcRanks,i)}</tr>`);
   }
-  // build two independent tables side by side using a wrapper table (simpler & reliable in Word)
-  const gmRowsHtml = gmList.map((g,i)=>`<tr><td>${g.shortName}</td><td align="right">${fmtNum(g.total)}</td><td align="right">${fmtNum(g.con)}</td>${showTB?`<td align="right">${fmtNum(g.tb)}</td>`:''}<td align="center">${gmRanks[i]}</td></tr>`).join('');
-  const dcRowsHtml = dcList.map((d,i)=>`<tr><td>${d.shortName}</td><td align="right">${fmtNum(d.total)}</td><td align="right">${fmtNum(d.con)}</td>${showTB?`<td align="right">${fmtNum(d.tb)}</td>`:''}<td align="center">${dcRanks[i]}</td></tr>`).join('');
-  const gmTotalRow = `<tr style="font-weight:bold;"><td>TỔNG</td><td align="right">${fmtNum(sumGmTotal)}</td><td align="right">${fmtNum(sumGmCon)}</td>${showTB?`<td align="right">${fmtNum(Math.round(sumGmTotal/ctx.numMonths))}</td>`:''}<td></td></tr>`;
-  const dcTotalRow = `<tr style="font-weight:bold;"><td>TỔNG</td><td align="right">${fmtNum(sumDcTotal)}</td><td align="right">${fmtNum(sumDcCon)}</td>${showTB?`<td align="right">${fmtNum(Math.round(sumDcTotal/ctx.numMonths))}</td>`:''}<td></td></tr>`;
+  const totalRow = `<tr style="font-weight:bold;"><td>TỔNG</td><td align="right">${fmtNum(sumGmTotal)}</td><td align="right">${fmtNum(sumGmCon)}</td>${showTB?`<td align="right">${fmtNum(Math.round(sumGmTotal/ctx.numMonths))}</td>`:''}<td></td><td class="gap"></td><td>TỔNG</td><td align="right">${fmtNum(sumDcTotal)}</td><td align="right">${fmtNum(sumDcCon)}</td>${showTB?`<td align="right">${fmtNum(Math.round(sumDcTotal/ctx.numMonths))}</td>`:''}<td></td></tr>`;
 
   const html = `
   <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
   <head><meta charset="utf-8"><style>
-    body{font-family:"Times New Roman", serif; font-size:12pt;}
+    body{font-family:"Times New Roman", serif; font-size:11pt;}
     table{border-collapse:collapse;}
-    .gmdc{border-collapse:collapse; table-layout:fixed;}
-    .gmdc td, .gmdc th{border:0.5pt solid #444; padding:3px 8px; white-space:nowrap;}
+    td, th{border:0.5pt solid #444; padding:2px 7px; white-space:nowrap;}
+    td.gap, th.gap{border:none; width:26pt;}
     th{font-weight:bold;}
-    .wrap{width:100%;}
-    .wrap>tbody>tr>td{border:none; vertical-align:top; padding:0 8px 0 0;}
     .center{text-align:center;}
   </style></head>
   <body>
     <p class="center"><b>${ctx.label}</b></p>
-    <table class="wrap" border="0" cellspacing="0" cellpadding="0"><tr>
-      <td style="border:none;">
-        <table class="gmdc"><tr>${headerCells}</tr>${gmRowsHtml}${gmTotalRow}</table>
-      </td>
-      <td style="border:none; width:40px;">&nbsp;</td>
-      <td style="border:none;">
-        <table class="gmdc"><tr>${headerCells}</tr>${dcRowsHtml}${dcTotalRow}</table>
-      </td>
-    </tr></table>
+    <table>
+      <tr>${headerCells}<th class="gap"></th>${headerCells}</tr>
+      ${bodyRows.join('')}
+      ${totalRow}
+    </table>
   </body></html>`;
   const blob = new Blob(['\ufeff', html], {type:'application/msword'});
   const link = document.createElement('a');
@@ -2213,12 +2278,42 @@ function exportMonthlyExcel(){
 }
 
 let STATS_SUMMARY = null;
+let STATS_NUM_MONTHS = 1;
+
+function toggleStatsTimeInputs(){
+  const mode = document.getElementById('statsTimeMode').value;
+  document.querySelectorAll('.stats-range-only').forEach(el=> el.style.display = mode==='range'?'':'none');
+  document.querySelectorAll('.stats-monthrange-only').forEach(el=> el.style.display = mode==='monthrange'?'':'none');
+}
 
 async function computeStatsRange(){
-  const from = document.getElementById('statsFrom').value;
-  const to = document.getElementById('statsTo').value;
+  const mode = document.getElementById('statsTimeMode').value;
+  let from, to;
+  STATS_NUM_MONTHS = 1;
+  if(mode==='range'){
+    from = document.getElementById('statsFrom').value;
+    to = document.getElementById('statsTo').value;
+  } else {
+    const mf = document.getElementById('statsMonthFrom').value, mt = document.getElementById('statsMonthTo').value;
+    if(!mf || !mt){ toast('Chọn đủ Từ tháng và Đến tháng.'); return; }
+    const [yf,mof] = mf.split('-').map(Number), [yt,mot] = mt.split('-').map(Number);
+    from = `${yf}-${String(mof).padStart(2,'0')}-01`;
+    to = `${yt}-${String(mot).padStart(2,'0')}-${String(new Date(yt,mot,0).getDate()).padStart(2,'0')}`;
+    STATS_NUM_MONTHS = Math.max(1, (yt-yf)*12 + (mot-mof) + 1);
+  }
   const batches = await loadBatchesInRange(from, to);
   STATS_SUMMARY = computeEarningsFromBatches(batches, from, to);
+  const kpiEl = document.getElementById('statsRangeKpi');
+  if(mode==='monthrange'){
+    const total = STATS_SUMMARY.list.reduce((s,x)=>s+x.total,0);
+    kpiEl.style.display='';
+    kpiEl.innerHTML = `
+      <div class="kpi"><div class="v">${STATS_NUM_MONTHS}</div><div class="l">Số tháng đã chọn</div></div>
+      <div class="kpi"><div class="v">${fmtNum(total)}</div><div class="l">Tổng thu toàn khoa</div></div>
+      <div class="kpi"><div class="v">${fmtNum(Math.round(total/STATS_NUM_MONTHS))}</div><div class="l">Trung bình/tháng (toàn khoa)</div></div>`;
+  } else {
+    kpiEl.style.display='none'; kpiEl.innerHTML='';
+  }
   renderStatsCharts();
 }
 
@@ -2233,7 +2328,10 @@ function renderStatsCharts(){
   }
   const topCountVal = document.getElementById('topCount').value;
   const topN = topCountVal==='all' ? res.list.length : parseInt(topCountVal);
-  const top = res.list.slice(0, topN).map(x=>({n:x.name, v:x.total}));
+  const useAvg = document.getElementById('statsTimeMode').value==='monthrange' && document.getElementById('topValueMode').value==='avg';
+  let top = res.list.map(x=>({n:x.name, v: useAvg? Math.round(x.total/STATS_NUM_MONTHS) : x.total}));
+  if(useAvg) top.sort((a,b)=>b.v-a.v);
+  top = top.slice(0, topN);
   barChart(document.getElementById('topChart'), top, topN);
 
   barChart(document.getElementById('typeChart'), [
