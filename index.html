@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Ứng dụng tính bồi dưỡng Phẫu thuật – Thủ thuật (NĐ 192/2026)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --navy:#12263a;
+    --navy2:#1c3a55;
+    --steel:#3d6a89;
+    --paper:#f6f4ee;
+    --paper2:#eee9dd;
+    --line:#d8d2c2;
+    --ink:#1d2226;
+    --accent:#b5501e;
+    --accent2:#7a9a3e;
+    --good:#2f6b4f;
+    --bad:#a4342a;
+    font-family: "Times New Roman", Times, serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Times New Roman", Times, serif;
+    font-size:15px;
+  }
+  .shell{max-width:1180px;margin:0 auto;padding:18px 20px 60px;}
+  header.app{
+    display:flex; align-items:baseline; justify-content:space-between;
+    border-bottom:3px double var(--navy); padding-bottom:10px; margin-bottom:14px;
+  }
+  header.app h1{
+    font-size:20px; margin:0; color:var(--navy); letter-spacing:.3px;
+  }
+  header.app .sub{font-size:12.5px; color:#5a5a52; font-style:italic;}
+  nav.tabs{
+    display:flex; gap:2px; margin-bottom:16px; border-bottom:1px solid var(--line);
+    flex-wrap:wrap;
+  }
+  nav.tabs button{
+    font-family:inherit; font-size:14px; padding:9px 16px; border:1px solid var(--line);
+    border-bottom:none; background:var(--paper2); color:#555; cursor:pointer;
+    border-radius:4px 4px 0 0; margin-bottom:-1px;
+  }
+  nav.tabs button.active{background:var(--paper); color:var(--navy); font-weight:bold; border-color:var(--navy2); border-bottom:2px solid var(--paper);}
+  section.tab{display:none;}
+  section.tab.active{display:block; animation:fade .15s ease;}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .card{
+    background:#fffdf8; border:1px solid var(--line); border-radius:6px;
+    padding:16px 18px; margin-bottom:16px;
+  }
+  .card h2{font-size:16px; color:var(--navy); margin:0 0 10px; border-left:4px solid var(--accent); padding-left:8px;}
+  .card h3{font-size:14.5px; color:var(--navy2); margin:14px 0 8px;}
+  .row{display:flex; gap:14px; flex-wrap:wrap;}
+  .col{flex:1; min-width:220px;}
+  label{font-size:13px; color:#444; display:block; margin-bottom:3px;}
+  input[type=text], input[type=number], input[type=date], select{
+    font-family:inherit; font-size:14px; padding:6px 8px; border:1px solid var(--line);
+    border-radius:3px; background:#fff; width:100%;
+  }
+  button.btn{
+    font-family:inherit; font-size:13.5px; padding:8px 14px; border-radius:4px;
+    border:1px solid var(--navy2); background:var(--navy2); color:#fff; cursor:pointer;
+  }
+  button.btn.secondary{background:#fff; color:var(--navy2);}
+  button.btn.warn{background:var(--bad); border-color:var(--bad);}
+  button.btn.small{padding:4px 9px; font-size:12px;}
+  button.btn:hover{opacity:.88;}
+  table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  table.data th, table.data td{border:1px solid var(--line); padding:5px 8px; text-align:left;}
+  table.data th{background:var(--navy); color:#fff; font-weight:normal; font-size:12.5px;}
+  table.data tr:nth-child(even) td{background:#faf8f2;}
+  table.data td.num{text-align:right; font-variant-numeric:tabular-nums;}
+  .pill{display:inline-block; padding:1px 8px; border-radius:10px; font-size:11px; background:var(--paper2); color:#555; border:1px solid var(--line);}
+  .muted{color:#7a756a; font-size:12.5px;}
+  .drop{
+    border:2px dashed var(--steel); border-radius:8px; padding:26px; text-align:center;
+    background:#fbfaf5; cursor:pointer;
+  }
+  .drop.drag{background:#eef3ee; border-color:var(--good);}
+  .mapgrid{display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; margin-top:10px;}
+  .mapgrid .item{display:flex; align-items:center; gap:8px; font-size:13px;}
+  .mapgrid .item span{flex:0 0 150px; color:#444;}
+  .mapgrid .item select{flex:1;}
+  .batchlist .b{
+    display:flex; justify-content:space-between; align-items:center; padding:8px 10px;
+    border:1px solid var(--line); border-radius:4px; margin-bottom:6px; background:#fff;
+  }
+  .toolbar{display:flex; gap:10px; align-items:end; flex-wrap:wrap; margin-bottom:12px;}
+  .bar-row{display:flex; align-items:center; gap:8px; margin:4px 0;}
+  .bar-row .name{flex:0 0 190px; font-size:12.5px;}
+  .bar-track{flex:1; background:var(--paper2); border-radius:3px; height:16px; position:relative; overflow:hidden;}
+  .bar-fill{background:linear-gradient(90deg,var(--steel),var(--navy2)); height:100%; border-radius:3px;}
+  .bar-val{flex:0 0 100px; text-align:right; font-size:12px; font-variant-numeric:tabular-nums;}
+  .flag{font-size:11.5px; padding:2px 6px; border-radius:3px; background:#fdecea; color:var(--bad); margin-left:6px;}
+  .toast{
+    position:fixed; bottom:18px; right:18px; background:var(--navy); color:#fff; padding:10px 16px;
+    border-radius:5px; font-size:13px; opacity:0; transform:translateY(8px); transition:.25s; pointer-events:none; z-index:99;
+  }
+  .toast.show{opacity:1; transform:translateY(0);}
+  .checklist{max-height:220px; overflow:auto; border:1px solid var(--line); border-radius:4px; padding:6px 10px; background:#fff;}
+  .checklist label{display:flex; align-items:center; gap:6px; font-size:13px; margin:3px 0; color:var(--ink);}
+  .kpis{display:flex; gap:12px; flex-wrap:wrap; margin-bottom:14px;}
+  .kpi{flex:1; min-width:150px; background:#fff; border:1px solid var(--line); border-radius:6px; padding:10px 14px;}
+  .kpi .v{font-size:22px; color:var(--navy); font-weight:bold;}
+  .kpi .l{font-size:11.5px; color:#7a756a; text-transform:uppercase; letter-spacing:.4px;}
+  #rateTable, #procRateTable{table-layout:fixed;}
+  #rateTable th, #rateTable td, #procRateTable th, #procRateTable td{width:25%;}
+  #rateTable td input{width:100%;}
+  input[type=number]{text-align:right;}
+  details.staffgroup{
+    border:1px solid var(--line); border-radius:6px; margin-bottom:10px; background:#fff; overflow:hidden;
+  }
+  details.staffgroup summary{
+    list-style:none; cursor:pointer; padding:9px 12px; background:var(--paper2);
+    font-weight:bold; color:var(--navy2); display:flex; align-items:center; gap:8px;
+  }
+  details.staffgroup summary::-webkit-details-marker{display:none;}
+  details.staffgroup summary::before{content:'▸'; color:var(--accent); transition:transform .15s;}
+  details.staffgroup[open] summary::before{transform:rotate(90deg);}
+  details.staffgroup summary .cnt{font-weight:normal; color:#7a756a; font-size:12px;}
+  .staffgroup table{table-layout:fixed;}
+  .staffgroup table input[type=text]{border:1px solid transparent; background:transparent; padding:4px 5px;}
+  .staffgroup table input[type=text]:hover, .staffgroup table input[type=text]:focus{border-color:var(--line); background:#fff;}
+  .staffgroup table select.dn-select{border:1px solid transparent; background:transparent; padding:4px 3px;}
+  .staffgroup table select.dn-select:hover, .staffgroup table select.dn-select:focus{border-color:var(--line); background:#fff;}
+  .staffgroup table td.chk{text-align:center;}
+  .staffgroup table input[type=number]{width:64px;}
+  .staffgroup table th:nth-child(1), .staffgroup table td:nth-child(1){width:4%;}
+  .staffgroup table th:nth-child(2), .staffgroup table td:nth-child(2){width:15%;}
+  .staffgroup table th:nth-child(3), .staffgroup table td:nth-child(3){width:8%;}
+  .staffgroup table th:nth-child(4), .staffgroup table td:nth-child(4){width:11%;}
+  .staffgroup table th:nth-child(5), .staffgroup table td:nth-child(5){width:6%;}
+  .staffgroup table th:nth-child(6), .staffgroup table td:nth-child(6){width:8%;}
+  .staffgroup table th:nth-child(7), .staffgroup table td:nth-child(7){width:8%;}
+  .staffgroup table th:nth-child(8), .staffgroup table td:nth-child(8){width:17%;}
+  .staffgroup table th:nth-child(9), .staffgroup table td:nth-child(9){width:8%;}
+  .staffgroup table th:nth-child(10), .staffgroup table td:nth-child(10){width:6%;}
+  .staffgroup table select.sel-gtmode{font-size:12px; padding:4px 3px;}
+  .staffgroup table input.edit-name{font-size:13.5px;}
+  #headerRowPreview table td{white-space:nowrap; max-width:160px; overflow:hidden; text-overflow:ellipsis;}
+  #headerRowPreview tr.hl-header-row td{border-top:2px solid var(--accent); border-bottom:2px solid var(--accent);}
+  details.card{padding:0;}
+  details.card > summary{
+    cursor:pointer; list-style:none; font-size:16px; color:var(--navy); font-weight:bold;
+    padding:16px 18px; border-left:4px solid var(--accent); display:flex; align-items:center; gap:8px;
+  }
+  details.card > summary::-webkit-details-marker{display:none;}
+  details.card > summary::before{content:'▸'; color:var(--accent); transition:transform .15s;}
+  details.card[open] > summary::before{transform:rotate(90deg);}
+  details.card > .card-body{padding:0 18px 16px 18px;}
+  ::-webkit-scrollbar{width:8px;height:8px;} ::-webkit-scrollbar-thumb{background:#c9c2ac;border-radius:4px;}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="app">
+    <div>
+      <h1>Bồi dưỡng Phẫu thuật – Thủ thuật</h1>
+      <div class="sub">Theo Nghị định 192/2026/NĐ-CP — Khoa Gây mê Hồi sức</div>
+    </div>
+    <div class="sub" id="clockInfo"></div>
+    <div class="sub" id="storageInfo" style="margin-top:4px;"></div>
+  </header>
+
+  <div id="storageWarnBanner" style="display:none; background:#fdecea; border:1px solid #e0a599; color:#7a2b20; padding:10px 14px; border-radius:6px; font-size:13.5px; margin-bottom:14px;"></div>
+
+  <nav class="tabs">
+    <button data-tab="import" class="active">1. Nhập dữ liệu</button>
+    <button data-tab="config">2. Danh mục &amp; đơn giá</button>
+    <button data-tab="summary">3. Bảng tổng hợp</button>
+    <button data-tab="stats">4. Thống kê</button>
+  </nav>
+
+  <!-- ===================== TAB 1: IMPORT ===================== -->
+  <section class="tab active" id="tab-import">
+    <div class="card">
+      <h2>Tải file dữ liệu từ phần mềm HIS</h2>
+      <p class="muted">Mỗi lần tải là một khung thời gian (đợt). Tất cả các đợt được lưu lại và cộng dồn tự động khi tính bảng tổng hợp theo tháng/khoảng ngày. Định dạng nhận: <b>.xlsx, .xls, .csv</b>. Nếu chỉ có file PDF từ HIS, hãy xuất lại dưới dạng Excel/CSV trong phần mềm HIS để bảo đảm cột dữ liệu không bị lẫn.</p>
+      <div class="drop" id="dropZone">
+        <div>📄 Kéo–thả file vào đây, hoặc bấm để chọn file</div>
+        <div class="muted" style="margin-top:6px;">(có thể chọn nhiều file cùng lúc — mỗi file 1 đợt riêng)</div>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" multiple style="display:none;">
+      </div>
+    </div>
+
+    <details class="card" id="mappingCard" style="display:none;" open>
+      <summary>Ánh xạ cột dữ liệu — <span id="mapFileName"></span> <span id="mapProfileLabel" class="muted" style="font-weight:normal; font-size:12.5px;"></span></summary>
+      <div class="card-body">
+      <p class="muted">Chỉ định mỗi cột trong file tương ứng với vai trò nào. Bấm "Lưu cấu hình ánh xạ" để lần sau tự áp dụng cho file cùng định dạng.</p>
+
+      <h3>Bước 1 — Xác nhận đúng dòng chứa tên cột</h3>
+      <div class="row" style="margin-bottom:8px;">
+        <div class="col" style="max-width:260px;">
+          <label>Loại báo cáo (ảnh hưởng cấu hình ánh xạ đã lưu)</label>
+          <select id="profileSelect">
+            <option value="da_hoan_thanh">Đã hoàn thành</option>
+            <option value="chua_hoan_thanh">Chưa hoàn thành</option>
+            <option value="mac_dinh">Mặc định / Khác</option>
+          </select>
+        </div>
+      </div>
+      <p class="muted">Nhiều báo cáo HIS có vài dòng tiêu đề (tên Sở/Bệnh viện, tên báo cáo, khoảng ngày...) phía trên dòng tên cột thật (STT, MÃ KCB...). App đã tự đoán, nhưng anh nên xem lại bảng bên dưới — dòng được tô cam là dòng app đang dùng làm tên cột. Nếu sai, đổi số dòng rồi bấm "Áp dụng".</p>
+      <div id="headerRowPreview"></div>
+      <div class="row" style="margin-top:8px; align-items:end;">
+        <div class="col" style="max-width:200px;">
+          <label>Dòng chứa tên cột (số thứ tự dòng)</label>
+          <input type="number" id="headerRowInput" min="1" value="1">
+        </div>
+        <div class="col" style="flex:0;"><button class="btn secondary small" id="btnApplyHeaderRow" type="button">Áp dụng</button></div>
+      </div>
+
+      <h3>Bước 2 — Chọn cột tương ứng vai trò</h3>
+      <div class="row">
+        <div class="col">
+          <label>Từ ngày của đợt này</label>
+          <input type="date" id="batchFrom">
+        </div>
+        <div class="col">
+          <label>Đến ngày của đợt này</label>
+          <input type="date" id="batchTo">
+        </div>
+        <div class="col">
+          <label>Ghi chú đợt (tuỳ chọn)</label>
+          <input type="text" id="batchNote" placeholder="VD: Đợt 1 tháng 7/2026">
+        </div>
+      </div>
+      <div class="mapgrid" id="mapGrid"></div>
+      <div style="margin-top:14px; display:flex; gap:10px;">
+        <button class="btn" id="btnSaveBatch">✔ Lưu đợt dữ liệu này</button>
+        <button class="btn secondary" id="btnRememberMap">Lưu cấu hình ánh xạ cho lần sau</button>
+        <button class="btn secondary" id="btnCancelMap">Hủy</button>
+      </div>
+      </div>
+    </details>
+
+    <div class="card">
+      <h2>Các đợt dữ liệu đã lưu</h2>
+      <div class="batchlist" id="batchList"><p class="muted">Chưa có đợt dữ liệu nào.</p></div>
+    </div>
+  </section>
+
+  <!-- ===================== TAB 2: CONFIG ===================== -->
+  <section class="tab" id="tab-config">
+    <details class="card" open>
+      <summary>Bảng đơn giá phẫu thuật (NĐ 192/2026) — đơn vị: đồng</summary>
+      <div class="card-body">
+      <p class="muted">Mức thủ thuật (T1/T2/T3/TDB) = 0,3 lần mức phẫu thuật cùng loại, được ứng dụng tự tính — không cần nhập tay.</p>
+      <table class="data" id="rateTable">
+        <thead><tr><th>Loại</th><th>Người mổ chính / GMHS chính / châm tê chính</th><th>Người phụ mổ / phụ GMHS / phụ châm tê</th><th>Người giúp việc (dụng cụ)</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div style="margin-top:10px;"><button class="btn secondary small" id="btnSaveRates">Lưu bảng đơn giá</button></div>
+      </div>
+    </details>
+
+    <details class="card" open>
+      <summary>Bảng đơn giá Thủ thuật (tự tính = 0,3 lần mức phẫu thuật cùng loại)</summary>
+      <div class="card-body">
+      <table class="data" id="procRateTable">
+        <thead><tr><th>Loại</th><th>Người thực hiện chính</th><th>Người phụ</th><th>Người giúp việc</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      </div>
+    </details>
+
+    <div class="card">
+      <h2>Tỷ lệ khấu trừ chung</h2>
+      <div class="row">
+        <div class="col">
+          <label>Tỷ lệ trừ (%) áp dụng trên tổng tiền mỗi người</label>
+          <input type="number" id="deductPct" value="6" step="0.5">
+        </div>
+      </div>
+    </div>
+
+    <details class="card" open>
+      <summary>Quy tắc miễn trừ theo Mã QĐ</summary>
+      <div class="card-body">
+      <p class="muted">Khi ca có <b>Mã QĐ</b> (đã ánh xạ ở bước Nhập dữ liệu) khớp tiền tố bên dưới — và đúng Loại đã chọn (bỏ trống = áp dụng mọi loại) — thì <b>không tính tiền</b> cho cột vai trò tương ứng trong ca đó.</p>
+      <table class="data" id="exemptTable">
+        <thead><tr><th>Mã QĐ (tiền tố)</th><th>Áp dụng Loại</th><th>Không tính cột</th><th>Ghi chú</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <h3>Thêm quy tắc mới</h3>
+      <div class="row">
+        <input type="text" id="newExemptMaQD" placeholder="VD: 12" style="max-width:120px;">
+        <div class="col" style="max-width:280px;">
+          <label class="muted">Áp dụng Loại (bỏ trống = tất cả)</label>
+          <label style="display:inline-flex;width:auto;margin-right:10px;"><input type="checkbox" class="newExemptTier" value="PDB" style="width:auto;"> ĐB</label>
+          <label style="display:inline-flex;width:auto;margin-right:10px;"><input type="checkbox" class="newExemptTier" value="P1" style="width:auto;"> I</label>
+          <label style="display:inline-flex;width:auto;margin-right:10px;"><input type="checkbox" class="newExemptTier" value="P2" style="width:auto;"> II</label>
+          <label style="display:inline-flex;width:auto;margin-right:10px;"><input type="checkbox" class="newExemptTier" value="P3" style="width:auto;"> III</label>
+        </div>
+        <div class="col" style="max-width:260px;">
+          <select id="newExemptField">
+            <option value="chinh1">PTTT Chính</option>
+            <option value="chinh2">Gây mê Chính</option>
+            <option value="phu1">PTTT Phụ 1</option>
+            <option value="phu2">PTTT Phụ 2</option>
+            <option value="phu3">Gây mê Phụ</option>
+            <option value="phu4">Dụng cụ (cột 1, sát Gây mê Phụ)</option>
+            <option value="giup1">Dụng cụ / Người giúp việc</option>
+          </select>
+        </div>
+        <input type="text" id="newExemptNote" placeholder="Ghi chú (tuỳ chọn)">
+        <button class="btn small" id="btnAddExempt" style="flex:0 0 auto;">Thêm</button>
+      </div>
+      </div>
+    </details>
+
+    <div class="card">
+      <h2>Danh mục nhân viên Khoa &amp; phân nhóm tính lương</h2>
+      <p class="muted">Danh sách được lấy sẵn theo "Danh sách nhân viên hưởng phẫu thuật" của Khoa Gây mê Hồi sức. Tick chọn nhóm ngay trên từng dòng để dùng khi tính <b>Cọc 1</b> (Điều dưỡng trưởng), <b>Hành chính phòng mổ</b>, hoặc <b>Bộ phận gián tiếp khác</b> (kèm hệ số riêng — nhân với mức Hành chính phòng mổ).</p>
+      <div class="toolbar">
+        <div class="col" style="max-width:200px;">
+          <label>Lọc theo đơn nguyên</label>
+          <select id="staffFilterDN"><option value="">Tất cả</option><option value="Phòng Mổ">Phòng Mổ</option><option value="Hồi Sức">Hồi Sức</option></select>
+        </div>
+        <div class="col" style="max-width:260px;">
+          <label>Tìm theo tên</label>
+          <input type="text" id="staffSearch" placeholder="Gõ để lọc...">
+        </div>
+        <div class="col" style="flex:0; align-self:end;">
+          <span class="pill" id="staffCountPill">0 người</span>
+        </div>
+        <div class="col" style="flex:0; align-self:end; display:flex; gap:6px;">
+          <button class="btn secondary small" id="btnExpandAll" type="button">Mở rộng tất cả</button>
+          <button class="btn secondary small" id="btnCollapseAll" type="button">Thu gọn tất cả</button>
+        </div>
+      </div>
+      <p class="muted" style="margin-top:-4px;">Có thể sửa trực tiếp Họ tên / Đơn nguyên / Chức vụ ngay trong bảng. Mỗi nhóm đơn nguyên là một khối có thể bấm để thu gọn/mở rộng.</p>
+      <div id="staffGroups"></div>
+      <h3>Thêm nhân viên mới vào danh mục</h3>
+      <div class="row">
+        <input type="text" id="newStaffName" placeholder="Họ và tên">
+        <select id="newStaffDN" style="max-width:150px;"><option value="Phòng Mổ">Phòng Mổ</option><option value="Hồi Sức">Hồi Sức</option></select>
+        <input type="text" id="newStaffCV" placeholder="Chức vụ / văn bằng (VD: BS CKII, CNGM, CNĐD...)">
+        <button class="btn small" id="btnAddStaff" style="flex:0 0 auto;">Thêm</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TAB 3: SUMMARY ===================== -->
+  <section class="tab" id="tab-summary">
+    <div class="card">
+      <h2>Chọn khoảng thời gian tổng hợp</h2>
+      <div class="toolbar">
+        <div class="col"><label>Từ ngày</label><input type="date" id="sumFrom"></div>
+        <div class="col"><label>Đến ngày</label><input type="date" id="sumTo"></div>
+        <div class="col" style="flex:0;"><button class="btn" id="btnCompute">⟳ Tính tổng hợp</button></div>
+        <div class="col" style="flex:0;"><button class="btn secondary" id="btnExportExcel">⬇ Xuất Excel</button></div>
+        <div class="col" style="flex:0;"><button class="btn secondary" id="btnExportWord">⬇ Xuất Word</button></div>
+      </div>
+      <div class="kpis" id="kpiRow"></div>
+    </div>
+
+    <div class="card">
+      <h2>Bảng tổng hợp tiền bồi dưỡng cá nhân (sắp xếp giảm dần)</h2>
+      <div style="overflow:auto;"><table class="data" id="summaryTable">
+        <thead><tr><th>STT</th><th>Họ tên</th><th>Số ca tham gia</th><th class="num">Tổng tiền (chưa trừ %)</th><th class="num">Tổng tiền (đã trừ %)</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <h2>Bảng chi bộ phận gián tiếp</h2>
+      <div id="giantiepSelectHint" class="muted" style="margin-bottom:8px;">Tick chọn nhân viên áp dụng cho từng nhóm trong đợt tính này (mặc định lấy theo danh mục cấu hình).</div>
+      <div class="row">
+        <div class="col"><h3>Cọc 1 (chọn để tính Điều dưỡng trưởng)</h3>
+          <input type="text" id="coc1Search" placeholder="Tìm tên để chọn..." style="margin-bottom:6px;">
+          <div id="coc1Pick" class="checklist"></div>
+        </div>
+        <div class="col"><h3>Hành chính phòng mổ (chọn để tính)</h3>
+          <input type="text" id="hcpmSearch" placeholder="Tìm tên để chọn..." style="margin-bottom:6px;">
+          <div id="hcpmPick" class="checklist"></div>
+        </div>
+      </div>
+      <div style="margin-top:10px;"><button class="btn secondary small" id="btnRecalcGT">⟳ Tính lại bộ phận gián tiếp</button></div>
+      <table class="data" style="margin-top:12px;" id="gtTable">
+        <thead><tr><th>Chức danh / Nhân viên</th><th class="num">Số tiền được hưởng</th><th>Ghi chú</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Danh sách nhân viên không được tính tiền (theo quy tắc miễn trừ)</h2>
+      <p class="muted">Các trường hợp trong khoảng ngày đã chọn bị loại khỏi tính tiền do khớp quy tắc miễn trừ Mã QĐ (xem/sửa quy tắc ở tab Danh mục &amp; đơn giá).</p>
+      <div style="overflow:auto;"><table class="data" id="exemptionCasesTable">
+        <thead><tr><th>Mã ca</th><th>Ngày</th><th>Họ tên</th><th>Cột không tính</th><th>Mã QĐ</th><th>Loại</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- ===================== TAB 4: STATS ===================== -->
+  <section class="tab" id="tab-stats">
+    <div class="card">
+      <h2>Top 10 nhân viên có tổng thu nhập cao nhất</h2>
+      <div id="topChart"></div>
+    </div>
+    <div class="row">
+      <div class="col card">
+        <h2>Tổng tiền theo Loại ca (Phẫu thuật / Thủ thuật)</h2>
+        <div id="typeChart"></div>
+      </div>
+      <div class="col card">
+        <h2>Số ca theo mức Loại P</h2>
+        <div id="loaipChart"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Xu hướng theo từng đợt nhập dữ liệu</h2>
+      <div id="trendChart"></div>
+    </div>
+
+    <div class="card">
+      <h2>Tổng thu theo tháng (tính trên toàn bộ dữ liệu đã lưu)</h2>
+      <p class="muted">Số liệu tổng thu chưa trừ % khấu trừ, gộp theo tháng từ tất cả các đợt đã nhập.</p>
+      <div class="toolbar">
+        <div class="col" style="max-width:280px;">
+          <label>Chọn nhân viên</label>
+          <select id="monthlyStaffSelect"><option value="">— Tất cả nhân viên (tổng khoa) —</option></select>
+        </div>
+      </div>
+      <div class="kpis" id="monthlyKpi"></div>
+      <div id="monthlyChart"></div>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   CONSTANTS
+   ============================================================ */
+const ROLE_FIELDS = [
+  {key:'caseId',   label:'Mã ca (STT/Mã KCB)'},
+  {key:'ngay',     label:'Ngày phẫu thuật'},
+  {key:'loaiP',    label:'Loại P (PDB/P1/P2/P3/TDB/T1..)'},
+  {key:'maQD',     label:'Mã QĐ (nếu có, để áp quy tắc miễn trừ)'},
+  {key:'tenDV',    label:'Tên dịch vụ (tuỳ chọn)'},
+  {key:'chinh1',   label:'PTTT Chính'},
+  {key:'chinh2',   label:'Gây mê / GMHS Chính'},
+  {key:'phu1',     label:'PTTT Phụ 1'},
+  {key:'phu2',     label:'PTTT Phụ 2'},
+  {key:'phu3',     label:'Gây mê Phụ'},
+  {key:'phu4',     label:'Dụng cụ (cột 1, sát Gây mê Phụ)'},
+  {key:'giup1',    label:'Dụng cụ / Người giúp việc'},
+];
+const DEFAULT_RATES = {
+  PDB:{chinh:560000, phu:400000, giup:240000},
+  P1: {chinh:250000, phu:180000, giup:140000},
+  P2: {chinh:130000, phu:100000, giup:60000},
+  P3: {chinh:100000, phu:60000,  giup:40000},
+};
+function tierOf(code){
+  if(!code) return null;
+  code = code.trim().toUpperCase();
+  if(code==='PDB') return {base:'PDB', isProc:false};
+  if(code==='P1') return {base:'P1', isProc:false};
+  if(code==='P2') return {base:'P2', isProc:false};
+  if(code==='P3') return {base:'P3', isProc:false};
+  if(code==='TDB') return {base:'PDB', isProc:true};
+  if(code==='T1') return {base:'P1', isProc:true};
+  if(code==='T2') return {base:'P2', isProc:true};
+  if(code==='T3') return {base:'P3', isProc:true};
+  return null;
+}
+
+/* ============================================================
+   DEFAULT STAFF ROSTER (Khoa Gây mê Hồi sức)
+   [name, đơn nguyên, chức vụ/văn bằng]
+   ============================================================ */
+const DEFAULT_STAFF_RAW = [
+["Võ Huy Cường","Phòng Mổ","Trưởng khoa - BS CKII"],
+["Nguyễn Thành","Hồi Sức","Phó trưởng khoa - BS CKII"],
+["Nguyễn Hà Tiến Dũng","Hồi Sức","Ths.BS"],
+["Lê Văn Thủy","Phòng Mổ","BS CKII"],
+["Nguyễn Trung Thành","Hồi Sức","Ths.BS"],
+["Trần Thị Dung","Phòng Mổ","BS CKII"],
+["Hứa Hữu Tuấn","Hồi Sức","BS CKI"],
+["Nguyễn Văn Thương","Phòng Mổ","BS CKI"],
+["Võ Đông Kinh","Hồi Sức","BS"],
+["Nguyễn Thị Bích Thủy","Phòng Mổ","BS"],
+["Đỗ Ngọc Vũ","Phòng Mổ","BS"],
+["Nguyễn Chí Bảo","Hồi Sức","BS"],
+["Nguyễn Tài Thu","Hồi Sức","BS CKI"],
+["Nguyễn Thanh Bảo","Phòng Mổ",""],
+["Trương Ngọc Báu","Phòng Mổ","CNGM"],
+["Võ Ngọc Bình","Phòng Mổ","CNGM"],
+["Đặng Văn Cảnh","Phòng Mổ","CNGM"],
+["Nguyễn Văn Chinh","Phòng Mổ","CNGM"],
+["Nguyễn Văn Chung","Phòng Mổ","CNGM"],
+["Trần Văn Đại","Phòng Mổ","CNGM"],
+["Hoàng Minh Hải","Phòng Mổ","CĐGM"],
+["Đặng Thu Hiền","Phòng Mổ","CNGM"],
+["Nguyễn Thanh Hoàng","Phòng Mổ","CNGM"],
+["Lê Thị Huệ","Phòng Mổ","CĐGM"],
+["Thân Hoàng Khang","Phòng Mổ","CNGM"],
+["Trần Quốc Khang","Phòng Mổ","CNGM"],
+["Đỗ Thành Khương","Phòng Mổ","CNGM"],
+["Trương Thị Bích Liễu","Phòng Mổ","CNGM"],
+["Nguyễn Duy Mỹ","Phòng Mổ","CNGM"],
+["Ngô Thị Nhựt","Phòng Mổ","CĐGM"],
+["Trần Thị Ngâng","Phòng Mổ","ĐDCKI"],
+["Nguyễn Thị Hồng Nhi","Phòng Mổ","CNGM"],
+["Đỗ Lê Thanh Ngọc","Phòng Mổ","CNGM"],
+["Đỗ Kim Oanh","Phòng Mổ","CĐGM"],
+["Trương Văn Pháp","Phòng Mổ","CNGM"],
+["Đặng Hồ Hồng Phi","Phòng Mổ","CĐGM"],
+["Nguyễn Phan Anh Quân","Phòng Mổ","CĐGM"],
+["Nguyễn Vũ Cẩm Tú","Phòng Mổ","CĐGM"],
+["Nguyễn Văn Tuy","Phòng Mổ","CNGM"],
+["Trần Bá Quyền","Phòng Mổ","CĐGM"],
+["Võ Thị Xuân Việt","Phòng Mổ","CĐGM"],
+["Đinh Kim Vũ","Phòng Mổ","CĐGM"],
+["Phạm Thị Hoàng Cúc","Phòng Mổ","CNGM"],
+["Đinh Thị Thu Hoài","Phòng Mổ","CNGM"],
+["Hồ Thị Mỹ","Phòng Mổ","CNGM"],
+["Phan Thị Mỹ Duyên","Phòng Mổ","CĐGM"],
+["Phan Thảo Vy","Phòng Mổ","CNGM"],
+["Võ Ngọc Phước","Phòng Mổ",""],
+["Lê Võ Thu","Phòng Mổ","CNĐD"],
+["Ngô Thị Lẹ","Phòng Mổ","CNĐD"],
+["Lê Thị Ái Phương","Phòng Mổ","CNĐD"],
+["Võ Thị Tường Vi","Phòng Mổ","CĐĐD"],
+["Nguyễn Thị Thúy Hằng","Phòng Mổ","CĐĐD"],
+["Trần Thị Mỹ Dung","Phòng Mổ","CNĐD"],
+["Nguyễn Tiến Dũng","Phòng Mổ","CĐĐD"],
+["Nguyễn Xuân Hoài","Phòng Mổ","CNĐD"],
+["Trần Xuân Hùng","Phòng Mổ","CNĐD"],
+["Lê Văn Kha","Phòng Mổ","CNĐD"],
+["Đặng Thị Mỹ Lai","Phòng Mổ","CNĐD"],
+["Nguyễn Cảnh Muộn","Phòng Mổ","CNĐD"],
+["Nguyễn Hoàng Sơn Nữ","Phòng Mổ","CĐĐD"],
+["Lê Văn Sang","Phòng Mổ","CNĐD"],
+["Phan Quốc Sang","Phòng Mổ","CNĐD"],
+["Võ Đình Tây","Phòng Mổ","CNĐD"],
+["Cao Việt Thắng","Phòng Mổ","CĐĐD"],
+["Trần Tiến Thành","Phòng Mổ","CNĐD"],
+["Trần Đăng Trung","Phòng Mổ","CNĐD"],
+["Nguyễn Đình Thắng","Phòng Mổ","CĐĐD"],
+["La Thị Thanh Trà","Phòng Mổ","CNĐD"],
+["Lê Thị Mạnh Quyền","Phòng Mổ","CNĐD"],
+["Đỗ Hồ Mỹ Hạnh","Phòng Mổ","CNĐD"],
+["Trương Đình Trí","Phòng Mổ","CNĐD"],
+["Trần Đình Bản","Phòng Mổ","CNĐD"],
+["Trần Thị Thanh Huyền","Phòng Mổ","CNĐD"],
+["Trần Đình Duy","Phòng Mổ","CNĐD"],
+["Nguyễn Hữu Phước","Phòng Mổ","CNĐD"],
+["Nguyễn Xuân Hiền","Phòng Mổ","CNĐD"],
+["Thân Thị Liễu","Phòng Mổ","CNĐD"],
+["Nguyễn Kim Sơn","Phòng Mổ","CĐĐD"],
+["Lê Văn Long","Phòng Mổ","CNĐD"],
+["Lê Quốc Triều","Phòng Mổ","CĐĐD"]
+];
+// Bổ sung: Danh sách điều dưỡng phòng Hồi sức (nạp thêm 1 lần qua seedVersion)
+const ICU_NURSES_RAW = [
+["Trần Thị Cẩm Nhung","Hồi Sức","CĐĐD"],
+["Phạm Thị Chiến","Hồi Sức","CNĐD"],
+["Hồ Thị Chúng","Hồi Sức","CNĐD"],
+["Nguyễn Thị Hảo","Hồi Sức","CNĐD"],
+["Trương Thị Thu Hằng","Hồi Sức","CNĐD"],
+["Nguyễn Đình Kim Loan","Hồi Sức","CNĐD"],
+["Phan Thị Thanh Nga","Hồi Sức","ĐDHC - CĐĐD"],
+["Hồ Thái Nhiều","Hồi Sức","CNĐD"],
+["Lê Thị Thúy Vân","Hồi Sức","CNĐD"],
+["Nguyễn Thị Minh Châu","Hồi Sức","CNĐD"],
+["Lê Thị Kim Sao","Hồi Sức","CNĐD"],
+["Lê Thị Kim Thịnh","Hồi Sức","CNĐD"],
+["Nguyễn Thị Xuân Thảo","Hồi Sức","CĐĐD"],
+["Trương Thị Tín","Hồi Sức","CĐĐD"],
+["Nguyễn Thị Thanh Nhi","Hồi Sức","CNĐD"],
+["Nguyễn Thị Diệu My","Hồi Sức","CNĐD"],
+["Đỗ Thị Ngọc Diễm","Hồi Sức","CNĐD"],
+["Đào Thị Phương Thúy","Hồi Sức","CNĐD"],
+["Huỳnh Thị Sự","Hồi Sức","CNĐD"],
+["Trần Thị Bích Tuyền","Hồi Sức","CNĐD"],
+["Huỳnh Thị Kim Hồng","Hồi Sức","CĐĐD"]
+];
+function buildDefaultStaff(){
+  return DEFAULT_STAFF_RAW.map(([name,donNguyen,chucVu])=>(
+    {name, donNguyen, chucVu, coc1:false, hcpm:false, giantiep:false, gtHeso:1, gtMode:'heso'}
+  ));
+}
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let CONFIG = {
+  rates: JSON.parse(JSON.stringify(DEFAULT_RATES)),
+  deductPct: 6,
+  staffMaster: [],
+  exemptRules: [
+    {maQD:'12', tiers:['P2','P3'], field:'phu4', note:'Không tính cột Dụng cụ (cột 1, sát Gây mê Phụ) khi Mã QĐ 12 và Loại II/III'},
+    {maQD:'14', tiers:[], field:'chinh2', note:'Không tính cột Gây mê Chính khi Mã QĐ 14 (liên quan phẫu thuật mắt)'}
+  ],
+  savedMappings: {}, // key: profile (vd 'da_hoan_thanh' / 'chua_hoan_thanh' / 'mac_dinh') -> mapping object
+  seedVersion: 0,
+};
+let BATCH_INDEX = []; // [{id, from, to, note, uploadedAt, filename, count}]
+let PENDING = null; // {rows, headers, filename}
+let CURRENT_SUMMARY = null;
+
+/* ============================================================
+   STORAGE HELPERS
+   ============================================================ */
+const HAS_ARTIFACT_STORAGE = (typeof window.storage !== 'undefined') && !!window.storage
+  && typeof window.storage.get === 'function' && typeof window.storage.set === 'function';
+const LS_PREFIX = 'boiduong_pttt:';
+
+let LAST_STORAGE_ERROR = null;
+
+async function testStorageAndWarn(){
+  const testKey = '__storage_test__';
+  const ok = await sSet(testKey, {t:Date.now()});
+  const banner = document.getElementById('storageWarnBanner');
+  if(!ok){
+    banner.style.display = 'block';
+    banner.innerHTML = `⚠ <b>Trình duyệt đang chặn lưu trữ dữ liệu</b> khi mở file trực tiếp kiểu <code>file://</code> (lỗi: ${LAST_STORAGE_ERROR||'không rõ'}).
+      Dữ liệu nhập vào sẽ <b>không được lưu lại</b> sau khi tải lại trang.
+      Cách khắc phục: đưa file này lên một trang web thật (GitHub Pages, hoặc bất kỳ máy chủ http/https nào) rồi mở qua đường link đó, thay vì mở trực tiếp file trong Downloads.`;
+  } else {
+    banner.style.display = 'none';
+    await sDelete(testKey);
+  }
+}
+
+async function sGet(key){
+  try{
+    if(HAS_ARTIFACT_STORAGE){
+      const r = await window.storage.get(key,false);
+      return r ? JSON.parse(r.value) : null;
+    } else {
+      const raw = localStorage.getItem(LS_PREFIX+key);
+      return raw ? JSON.parse(raw) : null;
+    }
+  } catch(e){ LAST_STORAGE_ERROR = (e && e.name ? e.name+': ' : '')+(e && e.message ? e.message : String(e)); return null; }
+}
+async function sSet(key,val){
+  try{
+    if(HAS_ARTIFACT_STORAGE){
+      await window.storage.set(key, JSON.stringify(val), false);
+    } else {
+      localStorage.setItem(LS_PREFIX+key, JSON.stringify(val));
+    }
+    return true;
+  } catch(e){
+    LAST_STORAGE_ERROR = (e && e.name ? e.name+': ' : '')+(e && e.message ? e.message : String(e));
+    console.error('storage set failed', e);
+    return false;
+  }
+}
+async function sDelete(key){
+  try{
+    if(HAS_ARTIFACT_STORAGE) await window.storage.delete(key,false);
+    else localStorage.removeItem(LS_PREFIX+key);
+  } catch(e){}
+}
+
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3800);
+}
+function fmt(n){
+  n = Math.round(n||0);
+  return n.toLocaleString('vi-VN')+' đ';
+}
+function fmtNum(n){ return Math.round(n||0).toLocaleString('vi-VN'); }
+
+/* ============================================================
+   INIT
+   ============================================================ */
+async function init(){
+  document.getElementById('clockInfo').textContent = new Date().toLocaleDateString('vi-VN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  document.getElementById('storageInfo').textContent = HAS_ARTIFACT_STORAGE
+    ? '☁ Dữ liệu lưu trong Claude'
+    : '💾 Dữ liệu lưu trên trình duyệt này (không tự đồng bộ sang máy/trình duyệt khác)';
+  await testStorageAndWarn();
+  const cfg = await sGet('config:main');
+  if(cfg) CONFIG = Object.assign(CONFIG, cfg);
+  migrateStaffConfig();
+  await sSet('config:main', CONFIG);
+  const idx = await sGet('batches:index');
+  if(idx) BATCH_INDEX = idx;
+  renderRateTable();
+  renderExemptTable();
+  renderStaffMasterTable();
+  renderBatchList();
+  setupTabs();
+  setupImport();
+  setupConfigHandlers();
+  setupSummaryHandlers();
+  document.getElementById('monthlyStaffSelect').addEventListener('change', renderMonthlyChart);
+  // default date range = this month
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  document.getElementById('sumFrom').value = fmtDateInput(first);
+  document.getElementById('sumTo').value = fmtDateInput(now);
+}
+
+function migrateStaffConfig(){
+  // seed with department roster if empty or in old string format
+  if(!Array.isArray(CONFIG.staffMaster) || !CONFIG.staffMaster.length || typeof CONFIG.staffMaster[0]==='string'){
+    const old = Array.isArray(CONFIG.staffMaster) ? CONFIG.staffMaster : [];
+    CONFIG.staffMaster = buildDefaultStaff();
+    old.forEach(n=>{ if(n && !CONFIG.staffMaster.find(s=>s.name===n)) CONFIG.staffMaster.push({name:n, donNguyen:'', chucVu:'', coc1:false, hcpm:false, giantiep:false, gtHeso:1}); });
+  }
+  // migrate legacy separate group arrays (from earlier version) into per-row flags
+  const byName = n => CONFIG.staffMaster.find(s=>s.name===n);
+  if(Array.isArray(CONFIG.coc1)){
+    CONFIG.coc1.forEach(n=>{ const s=byName(typeof n==='string'?n:n.name); if(s) s.coc1=true; });
+    delete CONFIG.coc1;
+  }
+  if(Array.isArray(CONFIG.hcpm)){
+    CONFIG.hcpm.forEach(n=>{ const s=byName(typeof n==='string'?n:n.name); if(s) s.hcpm=true; });
+    delete CONFIG.hcpm;
+  }
+  if(Array.isArray(CONFIG.giantiep) && CONFIG.giantiep.length && typeof CONFIG.giantiep[0]==='object' && 'heso' in (CONFIG.giantiep[0]||{})){
+    CONFIG.giantiep.forEach(g=>{
+      let s = byName(g.name);
+      if(!s){ s = {name:g.name, donNguyen:'', chucVu:'', coc1:false, hcpm:false, giantiep:false, gtHeso:1}; CONFIG.staffMaster.push(s); }
+      s.giantiep = true; s.gtHeso = g.heso||1;
+    });
+    delete CONFIG.giantiep;
+  }
+  CONFIG.staffMaster.forEach(s=>{ if(s.gtMode===undefined) s.gtMode='heso'; if(s.gtHeso===undefined) s.gtHeso=1; });
+
+  // one-time fix: cột "sát Gây mê" cho quy tắc Mã QĐ 12 thực chất là Dụng cụ (phu4), không phải Gây mê Phụ (phu3)
+  if(!(CONFIG.ruleVersion>=2)){
+    (CONFIG.exemptRules||[]).forEach(rule=>{
+      if(rule.maQD==='12' && rule.field==='phu3'){
+        rule.field = 'phu4';
+        rule.note = 'Không tính cột Dụng cụ (cột 1, sát Gây mê Phụ) khi Mã QĐ 12 và Loại II/III';
+      }
+    });
+    CONFIG.ruleVersion = 2;
+  }
+
+  // migrate legacy single savedMapping into per-profile savedMappings
+  if(!CONFIG.savedMappings) CONFIG.savedMappings = {};
+  if(CONFIG.savedMapping){
+    if(!CONFIG.savedMappings.mac_dinh) CONFIG.savedMappings.mac_dinh = CONFIG.savedMapping;
+    delete CONFIG.savedMapping;
+  }
+
+  // one-time seed: bổ sung danh sách điều dưỡng phòng Hồi sức + sửa lại Võ Ngọc Phước
+  if(!(CONFIG.seedVersion>=2)){
+    ICU_NURSES_RAW.forEach(([name,donNguyen,chucVu])=>{
+      if(!CONFIG.staffMaster.find(s=>s.name===name)){
+        CONFIG.staffMaster.push({name, donNguyen, chucVu, coc1:false, hcpm:false, giantiep:false, gtHeso:1, gtMode:'heso'});
+      }
+    });
+    const phuoc = CONFIG.staffMaster.find(s=>s.name==='Võ Ngọc Phước');
+    if(phuoc && (!phuoc.chucVu || phuoc.chucVu==='')){
+      phuoc.donNguyen = 'Hồi Sức';
+      phuoc.chucVu = 'Điều dưỡng trưởng Khoa - ĐDCKI';
+    }
+    CONFIG.seedVersion = 2;
+  }
+}
+
+/* ============================================================
+   TABS
+   ============================================================ */
+function setupTabs(){
+  document.querySelectorAll('nav.tabs button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('section.tab').forEach(s=>s.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+      if(btn.dataset.tab==='stats') renderStats();
+      if(btn.dataset.tab==='summary') renderGtPickLists();
+    });
+  });
+}
+
+/* ============================================================
+   IMPORT
+   ============================================================ */
+function setupImport(){
+  const dz = document.getElementById('dropZone');
+  const fi = document.getElementById('fileInput');
+  dz.addEventListener('click', ()=>fi.click());
+  dz.addEventListener('dragover', e=>{e.preventDefault(); dz.classList.add('drag');});
+  dz.addEventListener('dragleave', ()=>dz.classList.remove('drag'));
+  dz.addEventListener('drop', e=>{
+    e.preventDefault(); dz.classList.remove('drag');
+    handleFiles(e.dataTransfer.files);
+  });
+  fi.addEventListener('change', e=>handleFiles(e.target.files));
+
+  document.getElementById('btnCancelMap').addEventListener('click', ()=>{
+    PENDING = null;
+    document.getElementById('mappingCard').style.display='none';
+  });
+  document.getElementById('btnSaveBatch').addEventListener('click', saveBatchFromMapping);
+  document.getElementById('btnRememberMap').addEventListener('click', async ()=>{
+    const mapping = readMappingFromUI();
+    CONFIG.savedMappings[PENDING.profileKey] = mapping;
+    await sSet('config:main', CONFIG);
+    toast(`Đã lưu cấu hình ánh xạ cho loại báo cáo "${PROFILE_LABELS[PENDING.profileKey]}" — lần sau file cùng loại sẽ tự áp dụng.`);
+  });
+  document.getElementById('profileSelect').addEventListener('change', e=>{
+    PENDING.profileKey = e.target.value;
+    document.getElementById('mapProfileLabel').textContent = `(đang dùng: báo cáo "${PROFILE_LABELS[PENDING.profileKey]}")`;
+    rebuildMapGrid();
+  });
+  document.getElementById('btnApplyHeaderRow').addEventListener('click', ()=>{
+    const n = parseInt(document.getElementById('headerRowInput').value);
+    if(!n || n<1 || n>PENDING.allRows.length){ toast('Số dòng không hợp lệ.'); return; }
+    PENDING.headerRowIdx = n-1;
+    applyHeaderRow();
+    renderHeaderRowPreview();
+    rebuildMapGrid();
+    toast(`Đã dùng dòng ${n} làm tên cột — kiểm tra lại các mục ánh xạ bên dưới.`);
+  });
+}
+
+function handleFiles(fileList){
+  const files = Array.from(fileList);
+  if(!files.length) return;
+  // process one at a time (queue)
+  processNext(files, 0);
+}
+function processNext(files, i){
+  if(i>=files.length) return;
+  const file = files[i];
+  const ext = (file.name.split('.').pop()||'').toLowerCase();
+  if(!['xlsx','xls','csv'].includes(ext)){
+    toast(`Không hỗ trợ định dạng ".${ext}" (${file.name}) — chỉ nhận .xlsx, .xls, .csv. Hãy xuất lại từ HIS ra Excel/CSV.`);
+    processNext(files, i+1);
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    try{
+      const data = new Uint8Array(e.target.result);
+      // Chặn file PDF thật bị đổi tên đuôi thành .xls/.xlsx/.csv (kiểm tra chữ ký "%PDF")
+      if(data.length>4 && data[0]===0x25 && data[1]===0x50 && data[2]===0x44 && data[3]===0x46){
+        toast(`"${file.name}" thực chất là file PDF (chỉ đổi tên đuôi), không phải Excel/CSV thật — không đọc được. Hãy xuất file Excel/CSV gốc từ HIS.`);
+        processNext(files, i+1);
+        return;
+      }
+      const wb = XLSX.read(data, {type:'array'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const allRows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:false, defval:''});
+      if(!allRows.length){ toast('File rỗng: '+file.name); processNext(files,i+1); return; }
+      const headerRowIdx = guessHeaderRowIndex(allRows);
+      PENDING = {allRows, headerRowIdx, filename:file.name, profileKey:guessProfileKey(file.name)};
+      applyHeaderRow();
+      openMappingUI();
+      // queue remaining files to process after this one is saved
+      PENDING._remaining = files.slice(i+1);
+    }catch(err){
+      toast('Không đọc được file: '+file.name);
+      console.error(err);
+      processNext(files,i+1);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// Đoán dòng chứa tên cột: nhiều báo cáo HIS có vài dòng tiêu đề (tên Sở/Bệnh viện, tên báo cáo...)
+// trước dòng tên cột thật, nên không thể luôn lấy dòng đầu tiên.
+// Đoán "hồ sơ ánh xạ" theo tên file — vì báo cáo "Đã hoàn thành" và "Chưa hoàn thành" có cấu trúc cột khác nhau
+function guessProfileKey(filename){
+  const n = (filename||'').toUpperCase();
+  if(n.includes('CHƯA HOÀN') || n.includes('CHUA HOAN') || n.includes('CHUA_HOAN')) return 'chua_hoan_thanh';
+  if(n.includes('ĐÃ HOÀN') || n.includes('DA HOAN') || n.includes('HOÀN THÀNH') || n.includes('HOAN THANH')) return 'da_hoan_thanh';
+  return 'mac_dinh';
+}
+const PROFILE_LABELS = {da_hoan_thanh:'Đã hoàn thành', chua_hoan_thanh:'Chưa hoàn thành', mac_dinh:'Mặc định'};
+
+function guessHeaderRowIndex(allRows){
+  const KEYWORDS = ['STT','MÃ KCB','LOẠI P','PTTT','NGÀY BĐ','HỌ TÊN','GÂY MÊ'];
+  let best = 0, bestScore = -1;
+  for(let r=0; r<Math.min(allRows.length,25); r++){
+    const rowText = allRows[r].map(c=>String(c||'').toUpperCase());
+    let score = 0;
+    KEYWORDS.forEach(k=>{ if(rowText.some(c=>c.includes(k))) score++; });
+    const nonEmpty = rowText.filter(c=>c.trim()!=='').length;
+    if(nonEmpty>=3) score += 0.1*nonEmpty; // ưu tiên dòng có nhiều cột không trống
+    if(score>bestScore){ bestScore = score; best = r; }
+  }
+  return bestScore>0 ? best : 0;
+}
+
+// Dựng lại headers/dataRows từ PENDING.headerRowIdx hiện tại
+function applyHeaderRow(){
+  const idx = PENDING.headerRowIdx;
+  const headers = (PENDING.allRows[idx]||[]).map(h=>String(h||'').trim());
+  const dataRows = PENDING.allRows.slice(idx+1).filter(r=>r.some(c=>String(c).trim()!==''));
+  PENDING.headers = headers;
+  PENDING.rows = dataRows;
+}
+
+function renderHeaderRowPreview(){
+  const box = document.getElementById('headerRowPreview');
+  if(!box) return;
+  const rows = PENDING.allRows.slice(0, 15);
+  box.innerHTML = `<div style="overflow:auto; max-height:220px; border:1px solid var(--line); border-radius:4px;">
+    <table class="data" style="font-size:12px;">
+      <tbody>
+        ${rows.map((r,i)=>`<tr class="${i===PENDING.headerRowIdx?'hl-header-row':''}">
+            <td style="background:${i===PENDING.headerRowIdx?'#fdecd8':'#f4f1ea'}; font-weight:bold; white-space:nowrap;">Dòng ${i+1}${i===PENDING.headerRowIdx?' ✓':''}</td>
+            ${r.slice(0,14).map(c=>`<td>${String(c||'').slice(0,28)}</td>`).join('')}
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function openMappingUI(){
+  document.getElementById('mapFileName').textContent = PENDING.filename;
+  document.getElementById('mapProfileLabel').textContent = `(nhận diện: báo cáo "${PROFILE_LABELS[PENDING.profileKey]}")`;
+  document.getElementById('profileSelect').value = PENDING.profileKey;
+  document.getElementById('mappingCard').style.display='block';
+  document.getElementById('headerRowInput').value = PENDING.headerRowIdx+1;
+  renderHeaderRowPreview();
+  rebuildMapGrid();
+}
+
+function rebuildMapGrid(){
+  const grid = document.getElementById('mapGrid');
+  grid.innerHTML='';
+  const headers = PENDING.headers;
+  ROLE_FIELDS.forEach(f=>{
+    const div = document.createElement('div');
+    div.className='item';
+    const opts = ['<option value="">— không có —</option>']
+      .concat(headers.map((h,idx)=>`<option value="${idx}">${h||'(cột '+(idx+1)+')'}</option>`));
+    div.innerHTML = `<span>${f.label}</span><select data-field="${f.key}">${opts.join('')}</select>`;
+    grid.appendChild(div);
+  });
+  // auto-apply saved mapping (theo đúng loại báo cáo/profile) hoặc đoán theo tên cột
+  const savedMapping = CONFIG.savedMappings[PENDING.profileKey];
+  const sel = grid.querySelectorAll('select');
+  sel.forEach(s=>{
+    const field = s.dataset.field;
+    if(savedMapping && savedMapping[field]!==undefined && savedMapping[field]!==null){
+      const headerName = savedMapping[field+'__name'];
+      let idx = headers.findIndex(h=>h===headerName);
+      if(idx<0) idx = savedMapping[field];
+      if(idx>=0 && idx<headers.length) s.value = idx;
+    } else {
+      // naive guess by header text
+      const guesses = {
+        caseId:['MÃ KCB','STT'], ngay:['NGÀY BĐ','NGÀY'], loaiP:['LOẠI P'], maQD:['MÃ QĐ','MA QD'],
+        tenDV:['TÊN DỊCH VỤ'], chinh1:['PTTT CHÍNH'], chinh2:['GÂY MÊ CHÍNH','GÂY'],
+        phu1:['PTTT PHỤ 1'], phu2:['PTTT PHỤ 2'], phu3:['GÂY MÊ PHỤ'], giup1:['DỤNG CỤ']
+      };
+      const cand = guesses[field]||[];
+      for(const c of cand){
+        const idx = headers.findIndex(h=>h.toUpperCase().includes(c));
+        if(idx>=0){ s.value=idx; break; }
+      }
+    }
+  });
+  autoFillDateRange();
+  grid.querySelector('select[data-field="ngay"]').addEventListener('change', autoFillDateRange);
+}
+
+// Tự động lấy Từ ngày/Đến ngày của đợt theo dữ liệu thật trong file (cột đã ánh xạ "Ngày phẫu thuật")
+function autoFillDateRange(){
+  const sel = document.querySelector('#mapGrid select[data-field="ngay"]');
+  if(!sel || sel.value==='') return;
+  const colIdx = parseInt(sel.value);
+  let min=null, max=null;
+  PENDING.rows.forEach(r=>{
+    const d = parseVNDate(r[colIdx]);
+    if(!d || isNaN(d)) return;
+    if(!min || d<min) min=d;
+    if(!max || d>max) max=d;
+  });
+  if(min && max){
+    document.getElementById('batchFrom').value = fmtDateInput(min);
+    document.getElementById('batchTo').value = fmtDateInput(max);
+  }
+}
+
+function readMappingFromUI(){
+  const grid = document.getElementById('mapGrid');
+  const mapping = {};
+  grid.querySelectorAll('select').forEach(s=>{
+    const field = s.dataset.field;
+    mapping[field] = s.value===''? null : parseInt(s.value);
+    mapping[field+'__name'] = s.value===''? null : PENDING.headers[parseInt(s.value)];
+  });
+  return mapping;
+}
+
+function computeBatchExemptions(rows){
+  const list = [];
+  rows.forEach(r=>{
+    const excluded = excludedFieldsForRow(r);
+    if(!excluded.size) return;
+    excluded.forEach(fieldKey=>{
+      const name = r[fieldKey];
+      if(!name) return;
+      list.push({caseId:r.caseId, ngay:r.ngay, name:name.trim(), field:fieldKey, maQD:r.maQD, loaiP:r.loaiP});
+    });
+  });
+  return list;
+}
+
+async function saveBatchFromMapping(){
+  const mapping = readMappingFromUI();
+  const from = document.getElementById('batchFrom').value;
+  const to = document.getElementById('batchTo').value;
+  if(!from || !to){ toast('Vui lòng nhập khoảng ngày cho đợt này.'); return; }
+  const id = 'b_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  const rows = PENDING.rows.map(r=>{
+    const get = (f)=> mapping[f]!=null ? String(r[mapping[f]]||'').trim() : '';
+    return {
+      caseId:get('caseId'), ngay:get('ngay'), loaiP:get('loaiP').toUpperCase(), maQD:get('maQD'), tenDV:get('tenDV'),
+      chinh1:get('chinh1'), chinh2:get('chinh2'), phu1:get('phu1'), phu2:get('phu2'), phu3:get('phu3'), phu4:get('phu4'), giup1:get('giup1')
+    };
+  }).filter(r=>r.loaiP); // must have a valid tier code to be usable
+  const exemptCases = computeBatchExemptions(rows);
+  const batch = {
+    id, from, to, note:document.getElementById('batchNote').value||'', filename:PENDING.filename,
+    uploadedAt:new Date().toISOString(), rows, exemptCases
+  };
+  const ok = await sSet('batch:'+id, batch);
+  if(!ok){ toast('Lỗi lưu trữ: '+(LAST_STORAGE_ERROR||'không rõ nguyên nhân')+'. Thử lại.'); return; }
+  BATCH_INDEX.push({id, from, to, note:batch.note, uploadedAt:batch.uploadedAt, filename:batch.filename, count:rows.length, exemptCases});
+  await sSet('batches:index', BATCH_INDEX);
+  toast(`Đã lưu đợt "${batch.filename}" — ${rows.length} ca${exemptCases.length? `, ${exemptCases.length} trường hợp không tính tiền theo quy tắc miễn trừ`:''}.`);
+  renderBatchList();
+  document.getElementById('mappingCard').style.display='none';
+  document.getElementById('batchFrom').value=''; document.getElementById('batchTo').value=''; document.getElementById('batchNote').value='';
+  const remaining = PENDING._remaining||[];
+  PENDING = null;
+  if(remaining.length) processNext(remaining,0);
+}
+
+function renderBatchList(){
+  const el = document.getElementById('batchList');
+  if(!BATCH_INDEX.length){ el.innerHTML='<p class="muted">Chưa có đợt dữ liệu nào.</p>'; return; }
+  el.innerHTML='';
+  BATCH_INDEX.slice().sort((a,b)=> new Date(b.uploadedAt)-new Date(a.uploadedAt)).forEach(b=>{
+    const wrap = document.createElement('div');
+    const exempt = b.exemptCases||[];
+    const exemptRowsHtml = exempt.map(e=>`<tr><td>${e.caseId||''}</td><td>${e.ngay||''}</td><td>${e.name}</td><td>${FIELD_LABELS[e.field]||e.field}</td><td>${e.maQD||''}</td><td>${e.loaiP||''}</td></tr>`).join('');
+    wrap.innerHTML = `<div class="b">
+        <div><b>${b.filename}</b> <span class="pill">${b.from} → ${b.to}</span> <span class="muted">${b.count} ca ${b.note?(' · '+b.note):''}</span>
+          ${exempt.length? `<span class="flag">${exempt.length} ca không tính tiền (miễn trừ)</span>`:''}
+        </div>
+        <div><button class="btn warn small" data-id="${b.id}">Xoá</button></div>
+      </div>
+      ${exempt.length? `<details style="margin:-4px 0 8px 0;">
+        <summary class="muted" style="cursor:pointer;">Xem danh sách ${exempt.length} trường hợp không tính tiền của đợt này</summary>
+        <div style="overflow:auto;"><table class="data" style="margin-top:6px;">
+          <thead><tr><th>Mã ca</th><th>Ngày</th><th>Họ tên</th><th>Cột không tính</th><th>Mã QĐ</th><th>Loại</th></tr></thead>
+          <tbody>${exemptRowsHtml}</tbody>
+        </table></div>
+      </details>`:''}`;
+    wrap.querySelector('button[data-id]').addEventListener('click', async ()=>{
+      if(!confirm('Xoá đợt dữ liệu này?')) return;
+      await sDelete('batch:'+b.id);
+      BATCH_INDEX = BATCH_INDEX.filter(x=>x.id!==b.id);
+      await sSet('batches:index', BATCH_INDEX);
+      renderBatchList();
+      toast('Đã xoá đợt dữ liệu.');
+    });
+    el.appendChild(wrap);
+  });
+}
+
+/* ============================================================
+   CONFIG TAB
+   ============================================================ */
+function renderRateTable(){
+  const tb = document.querySelector('#rateTable tbody');
+  tb.innerHTML='';
+  const labels = {PDB:'Đặc biệt', P1:'Loại I', P2:'Loại II', P3:'Loại III'};
+  Object.keys(labels).forEach(tier=>{
+    const r = CONFIG.rates[tier];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><b>${labels[tier]}</b> <span class="muted">(${tier})</span></td>
+      <td><input type="number" data-tier="${tier}" data-role="chinh" value="${r.chinh}"></td>
+      <td><input type="number" data-tier="${tier}" data-role="phu" value="${r.phu}"></td>
+      <td><input type="number" data-tier="${tier}" data-role="giup" value="${r.giup}"></td>`;
+    tb.appendChild(tr);
+  });
+  document.getElementById('deductPct').value = CONFIG.deductPct;
+  document.querySelectorAll('#rateTable input').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const tier = inp.dataset.tier, role = inp.dataset.role;
+      const tmp = JSON.parse(JSON.stringify(CONFIG.rates));
+      tmp[tier][role] = parseFloat(inp.value)||0;
+      renderProcRateTable(tmp);
+    });
+  });
+  renderProcRateTable();
+}
+
+function renderProcRateTable(ratesOverride){
+  const tb = document.querySelector('#procRateTable tbody');
+  if(!tb) return;
+  tb.innerHTML='';
+  const rates = ratesOverride || CONFIG.rates;
+  const labels = {PDB:'Đặc biệt (TDB)', P1:'Loại I (T1)', P2:'Loại II (T2)', P3:'Loại III (T3)'};
+  Object.keys(labels).forEach(tier=>{
+    const r = rates[tier];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><b>${labels[tier]}</b></td>
+      <td class="num">${fmtNum(Math.round(r.chinh*0.3))}</td>
+      <td class="num">${fmtNum(Math.round(r.phu*0.3))}</td>
+      <td class="num">${fmtNum(Math.round(r.giup*0.3))}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+const FIELD_LABELS = {
+  chinh1:'PTTT Chính', chinh2:'Gây mê Chính', phu1:'PTTT Phụ 1', phu2:'PTTT Phụ 2',
+  phu3:'Gây mê Phụ', phu4:'Dụng cụ (cột 1, sát Gây mê Phụ)', giup1:'Dụng cụ / Người giúp việc'
+};
+const TIER_LABELS = {PDB:'ĐB', P1:'I', P2:'II', P3:'III'};
+
+function renderExemptTable(){
+  const tb = document.querySelector('#exemptTable tbody');
+  if(!tb) return;
+  tb.innerHTML='';
+  (CONFIG.exemptRules||[]).forEach((rule,i)=>{
+    const tr = document.createElement('tr');
+    const tiersTxt = (rule.tiers&&rule.tiers.length) ? rule.tiers.map(t=>TIER_LABELS[t]||t).join(', ') : 'Tất cả';
+    tr.innerHTML = `<td>${rule.maQD}</td><td>${tiersTxt}</td><td>${FIELD_LABELS[rule.field]||rule.field}</td>
+      <td class="muted">${rule.note||''}</td>
+      <td><button class="btn warn small" data-idx="${i}" type="button">Xoá</button></td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll('button[data-idx]').forEach(btn=>btn.onclick=async()=>{
+    CONFIG.exemptRules.splice(parseInt(btn.dataset.idx),1);
+    await sSet('config:main',CONFIG);
+    renderExemptTable();
+  });
+}
+
+const GT_MODE_LABELS = {
+  heso: 'Hệ số riêng',
+  dt: '= ĐD trưởng',
+  hcpm: '= HC phòng mổ',
+  hchs: '= HC hồi sức'
+};
+
+function renderStaffMasterTable(){
+  const container = document.getElementById('staffGroups');
+  if(!container) return;
+  const filterDN = document.getElementById('staffFilterDN').value;
+  const search = document.getElementById('staffSearch').value.trim().toLowerCase();
+
+  // group by đơn nguyên, keep original index for each person
+  const groups = {};
+  const groupOrder = ['Phòng Mổ','Hồi Sức'];
+  CONFIG.staffMaster.forEach((s,i)=>{
+    if(filterDN && s.donNguyen!==filterDN) return;
+    if(search && !s.name.toLowerCase().includes(search)) return;
+    const key = s.donNguyen && s.donNguyen.trim() ? s.donNguyen : 'Khác';
+    if(!groups[key]) groups[key]=[];
+    groups[key].push(i);
+  });
+  Object.keys(groups).forEach(k=>{ if(!groupOrder.includes(k)) groupOrder.push(k); });
+
+  let shown=0;
+  const wasOpen = {};
+  container.querySelectorAll('details.staffgroup').forEach(d=> wasOpen[d.dataset.group] = d.open);
+
+  container.innerHTML = groupOrder.filter(k=>groups[k]&&groups[k].length).map(key=>{
+    const idxs = groups[key];
+    shown += idxs.length;
+    const rows = idxs.map((i,pos)=>{
+      const s = CONFIG.staffMaster[i];
+      return `<tr>
+        <td>${pos+1}</td>
+        <td><input type="text" class="edit-name" data-idx="${i}" value="${s.name.replace(/"/g,'&quot;')}"></td>
+        <td>
+          <select class="dn-select" data-idx="${i}">
+            <option value="Phòng Mổ" ${s.donNguyen==='Phòng Mổ'?'selected':''}>Phòng Mổ</option>
+            <option value="Hồi Sức" ${s.donNguyen==='Hồi Sức'?'selected':''}>Hồi Sức</option>
+            <option value="" ${!s.donNguyen?'selected':''}>—</option>
+          </select>
+        </td>
+        <td><input type="text" class="edit-cv" data-idx="${i}" value="${(s.chucVu||'').replace(/"/g,'&quot;')}"></td>
+        <td class="chk"><input type="checkbox" class="chk-coc1" data-idx="${i}" ${s.coc1?'checked':''}></td>
+        <td class="chk"><input type="checkbox" class="chk-hcpm" data-idx="${i}" ${s.hcpm?'checked':''}></td>
+        <td class="chk"><input type="checkbox" class="chk-gt" data-idx="${i}" ${s.giantiep?'checked':''}></td>
+        <td>
+          <select class="sel-gtmode" data-idx="${i}">
+            ${Object.keys(GT_MODE_LABELS).map(m=>`<option value="${m}" ${s.gtMode===m?'selected':''}>${GT_MODE_LABELS[m]}</option>`).join('')}
+          </select>
+        </td>
+        <td><input type="number" step="0.05" class="inp-gtheso" data-idx="${i}" value="${s.gtHeso??1}" ${s.gtMode!=='heso'?'disabled':''}></td>
+        <td><button class="btn warn small" data-idx="${i}" type="button">Xoá</button></td>
+      </tr>`;
+    }).join('');
+    const isOpen = wasOpen[key]!==undefined ? wasOpen[key] : true;
+    return `<details class="staffgroup" data-group="${key}" ${isOpen?'open':''}>
+      <summary>${key} <span class="cnt">(${idxs.length} người)</span></summary>
+      <div style="overflow:auto;">
+      <table class="data">
+        <thead><tr>
+          <th>STT</th><th>Họ tên</th><th>Đơn nguyên</th><th>Chức vụ / Văn bằng</th>
+          <th style="text-align:center;">Cọc 1</th><th style="text-align:center;">HC phòng mổ</th>
+          <th style="text-align:center;">Gián tiếp khác</th><th>Hưởng theo mức</th><th>Hệ số GT</th><th></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      </div>
+    </details>`;
+  }).join('') || '<p class="muted">Không tìm thấy nhân viên phù hợp.</p>';
+
+  document.getElementById('staffCountPill').textContent = shown+' người';
+  bindStaffTableEvents();
+}
+
+function bindStaffTableEvents(){
+  document.querySelectorAll('.edit-name').forEach(el=>el.onchange=async()=>{
+    CONFIG.staffMaster[parseInt(el.dataset.idx)].name = el.value.trim(); await sSet('config:main',CONFIG);
+    document.getElementById('staffCountPill').textContent; // no full re-render needed
+  });
+  document.querySelectorAll('.dn-select').forEach(el=>el.onchange=async()=>{
+    CONFIG.staffMaster[parseInt(el.dataset.idx)].donNguyen = el.value; await sSet('config:main',CONFIG);
+    renderStaffMasterTable();
+  });
+  document.querySelectorAll('.edit-cv').forEach(el=>el.onchange=async()=>{
+    CONFIG.staffMaster[parseInt(el.dataset.idx)].chucVu = el.value.trim(); await sSet('config:main',CONFIG);
+  });
+  document.querySelectorAll('.chk-coc1').forEach(el=>el.onchange=async()=>{
+    CONFIG.staffMaster[parseInt(el.dataset.idx)].coc1 = el.checked; await sSet('config:main',CONFIG);
+  });
+  document.querySelectorAll('.chk-hcpm').forEach(el=>el.onchange=async()=>{
+    CONFIG.staffMaster[parseInt(el.dataset.idx)].hcpm = el.checked; await sSet('config:main',CONFIG);
+  });
+  document.querySelectorAll('.chk-gt').forEach(el=>el.onchange=async()=>{
+    CONFIG.staffMaster[parseInt(el.dataset.idx)].giantiep = el.checked; await sSet('config:main',CONFIG);
+  });
+  document.querySelectorAll('.sel-gtmode').forEach(el=>el.onchange=async()=>{
+    CONFIG.staffMaster[parseInt(el.dataset.idx)].gtMode = el.value; await sSet('config:main',CONFIG);
+    renderStaffMasterTable();
+  });
+  document.querySelectorAll('.inp-gtheso').forEach(el=>el.onchange=async()=>{
+    CONFIG.staffMaster[parseInt(el.dataset.idx)].gtHeso = parseFloat(el.value)||1; await sSet('config:main',CONFIG);
+  });
+  document.querySelectorAll('#staffGroups button[data-idx]').forEach(el=>el.onclick=async()=>{
+    if(!confirm('Xoá nhân viên này khỏi danh mục?')) return;
+    CONFIG.staffMaster.splice(parseInt(el.dataset.idx),1);
+    await sSet('config:main',CONFIG);
+    renderStaffMasterTable();
+  });
+}
+
+function setupConfigHandlers(){
+  document.getElementById('btnSaveRates').addEventListener('click', async ()=>{
+    document.querySelectorAll('#rateTable input').forEach(inp=>{
+      CONFIG.rates[inp.dataset.tier][inp.dataset.role] = parseFloat(inp.value)||0;
+    });
+    CONFIG.deductPct = parseFloat(document.getElementById('deductPct').value)||0;
+    await sSet('config:main', CONFIG);
+    renderProcRateTable();
+    toast('Đã lưu bảng đơn giá.');
+  });
+
+  document.getElementById('btnAddExempt').addEventListener('click', async ()=>{
+    const maQD = document.getElementById('newExemptMaQD').value.trim();
+    if(!maQD){ toast('Nhập Mã QĐ trước.'); return; }
+    const tiers = Array.from(document.querySelectorAll('.newExemptTier:checked')).map(x=>x.value);
+    const field = document.getElementById('newExemptField').value;
+    const note = document.getElementById('newExemptNote').value.trim();
+    CONFIG.exemptRules.push({maQD, tiers, field, note});
+    document.getElementById('newExemptMaQD').value='';
+    document.getElementById('newExemptNote').value='';
+    document.querySelectorAll('.newExemptTier').forEach(x=>x.checked=false);
+    await sSet('config:main', CONFIG);
+    renderExemptTable();
+    toast('Đã thêm quy tắc miễn trừ.');
+  });
+
+  document.getElementById('staffFilterDN').addEventListener('change', renderStaffMasterTable);
+  document.getElementById('staffSearch').addEventListener('input', renderStaffMasterTable);
+  document.getElementById('btnExpandAll').addEventListener('click', ()=>{
+    document.querySelectorAll('#staffGroups details.staffgroup').forEach(d=>d.open=true);
+  });
+  document.getElementById('btnCollapseAll').addEventListener('click', ()=>{
+    document.querySelectorAll('#staffGroups details.staffgroup').forEach(d=>d.open=false);
+  });
+
+  document.getElementById('btnAddStaff').addEventListener('click', async ()=>{
+    const name = document.getElementById('newStaffName').value.trim();
+    if(!name) return;
+    const donNguyen = document.getElementById('newStaffDN').value;
+    const chucVu = document.getElementById('newStaffCV').value.trim();
+    CONFIG.staffMaster.push({name, donNguyen, chucVu, coc1:false, hcpm:false, giantiep:false, gtHeso:1, gtMode:'heso'});
+    document.getElementById('newStaffName').value='';
+    document.getElementById('newStaffCV').value='';
+    await sSet('config:main', CONFIG);
+    renderStaffMasterTable();
+    toast('Đã thêm nhân viên vào danh mục.');
+  });
+}
+
+/* ============================================================
+   CALC ENGINE
+   ============================================================ */
+function rateFor(loaiP, role){
+  const t = tierOf(loaiP);
+  if(!t) return 0;
+  const base = CONFIG.rates[t.base][role];
+  return t.isProc ? Math.round(base*0.3) : base;
+}
+function isProcCode(loaiP){ const t=tierOf(loaiP); return t? t.isProc : false; }
+
+function excludedFieldsForRow(row){
+  const excluded = new Set();
+  const maQD = row.maQD ? String(row.maQD).trim() : '';
+  if(!maQD) return excluded;
+  const tier = tierOf(row.loaiP);
+  (CONFIG.exemptRules||[]).forEach(rule=>{
+    if(!rule.maQD) return;
+    if(!maQD.startsWith(String(rule.maQD).trim())) return;
+    if(rule.tiers && rule.tiers.length){
+      if(!tier || !rule.tiers.includes(tier.base)) return;
+    }
+    excluded.add(rule.field);
+  });
+  return excluded;
+}
+
+async function loadBatchesInRange(from, to){
+  const fromD = from? new Date(from): null;
+  const toD = to? new Date(to): null;
+  const relevant = BATCH_INDEX.filter(b=>{
+    if(!fromD || !toD) return true;
+    return new Date(b.from) <= toD && new Date(b.to) >= fromD;
+  });
+  const batches = [];
+  for(const meta of relevant){
+    const b = await sGet('batch:'+meta.id);
+    if(b) batches.push(b);
+  }
+  return batches;
+}
+
+function computeEarningsFromBatches(batches, from, to){
+  const fromD = from? new Date(from): null;
+  const toD = to? new Date(to): null;
+  const perStaff = {}; // name -> {total, cases:Set}
+  let totalPT=0, totalTT=0;
+  const loaiPCount = {};
+  const perBatchTotal = {}; // batchId -> total
+
+  function add(name, amount, batchId){
+    if(!name) return;
+    name = name.trim();
+    if(!name) return;
+    if(!perStaff[name]) perStaff[name] = {total:0, cases:new Set()};
+    perStaff[name].total += amount;
+  }
+
+  const exemptions = [];
+
+  batches.forEach(batch=>{
+    let inRangeCount=0;
+    batch.rows.forEach(r=>{
+      if(fromD && toD){
+        const d = parseVNDate(r.ngay);
+        if(d && (d < fromD || d > toD)) return;
+      }
+      inRangeCount++;
+      const proc = isProcCode(r.loaiP);
+      loaiPCount[r.loaiP] = (loaiPCount[r.loaiP]||0)+1;
+      const cChinh = rateFor(r.loaiP,'chinh');
+      const cPhu = rateFor(r.loaiP,'phu');
+      const cGiup = rateFor(r.loaiP,'giup');
+      const excluded = excludedFieldsForRow(r);
+      let rowTotal = 0;
+      const maybeAdd = (fieldKey, name, rate)=>{
+        if(!name) return;
+        if(excluded.has(fieldKey)){
+          exemptions.push({caseId:r.caseId, ngay:r.ngay, name:name.trim(), field:fieldKey, maQD:r.maQD, loaiP:r.loaiP});
+          return;
+        }
+        add(name, rate, batch.id);
+        rowTotal += rate;
+      };
+      maybeAdd('chinh1', r.chinh1, cChinh);
+      maybeAdd('chinh2', r.chinh2, cChinh);
+      maybeAdd('phu1', r.phu1, cPhu);
+      maybeAdd('phu2', r.phu2, cPhu);
+      maybeAdd('phu3', r.phu3, cPhu);
+      maybeAdd('phu4', r.phu4, cPhu);
+      maybeAdd('giup1', r.giup1, cGiup);
+      if(proc) totalTT+=rowTotal; else totalPT+=rowTotal;
+      perBatchTotal[batch.id] = (perBatchTotal[batch.id]||0) + rowTotal;
+    });
+  });
+
+  const pct = CONFIG.deductPct/100;
+  const list = Object.keys(perStaff).map(name=>({
+    name, total: perStaff[name].total, afterDeduct: perStaff[name].total*(1-pct)
+  })).sort((a,b)=>b.total-a.total);
+
+  return {list, totalPT, totalTT, loaiPCount, perBatchTotal, exemptions};
+}
+
+function fmtDateInput(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function parseVNDate(s){
+  if(!s) return null;
+  s = String(s).trim();
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m) return new Date(+m[3], +m[2]-1, +m[1]);
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+/* ============================================================
+   SUMMARY TAB
+   ============================================================ */
+function setupSummaryHandlers(){
+  document.getElementById('btnCompute').addEventListener('click', runSummary);
+  document.getElementById('btnRecalcGT').addEventListener('click', computeGT);
+  document.getElementById('btnExportExcel').addEventListener('click', exportExcel);
+  document.getElementById('btnExportWord').addEventListener('click', exportWord);
+  document.getElementById('coc1Search').addEventListener('input', e=>filterPickList('coc1Pick', e.target.value));
+  document.getElementById('hcpmSearch').addEventListener('input', e=>filterPickList('hcpmPick', e.target.value));
+}
+
+async function runSummary(){
+  const from = document.getElementById('sumFrom').value;
+  const to = document.getElementById('sumTo').value;
+  if(!from || !to){ toast('Chọn khoảng ngày trước.'); return; }
+  const batches = await loadBatchesInRange(from, to);
+  if(!batches.length){ toast('Không có dữ liệu trong khoảng ngày này.'); }
+  const res = computeEarningsFromBatches(batches, from, to);
+  CURRENT_SUMMARY = res;
+  renderSummaryTable(res);
+  renderKpis(res);
+  renderExemptionCasesTable(res);
+  renderGtPickLists();
+  computeGT();
+  toast('Đã tính tổng hợp: '+res.list.length+' nhân viên.');
+}
+
+function renderExemptionCasesTable(res){
+  const tb = document.querySelector('#exemptionCasesTable tbody');
+  if(!tb) return;
+  tb.innerHTML='';
+  const rows = res.exemptions||[];
+  if(!rows.length){
+    tb.innerHTML = '<tr><td colspan="6" class="muted">Không có trường hợp nào bị miễn trừ trong khoảng ngày này.</td></tr>';
+    return;
+  }
+  rows.forEach(e=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${e.caseId||''}</td><td>${e.ngay||''}</td><td>${e.name}</td><td>${FIELD_LABELS[e.field]||e.field}</td><td>${e.maQD||''}</td><td>${e.loaiP||''}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function renderKpis(res){
+  const total = res.list.reduce((s,x)=>s+x.total,0);
+  const el = document.getElementById('kpiRow');
+  el.innerHTML = `
+    <div class="kpi"><div class="v">${res.list.length}</div><div class="l">Nhân viên hưởng chi</div></div>
+    <div class="kpi"><div class="v">${fmtNum(total)}</div><div class="l">Tổng chi (đồng)</div></div>
+    <div class="kpi"><div class="v">${fmtNum(res.totalPT)}</div><div class="l">Trong đó Phẫu thuật</div></div>
+    <div class="kpi"><div class="v">${fmtNum(res.totalTT)}</div><div class="l">Trong đó Thủ thuật</div></div>
+  `;
+}
+
+function renderSummaryTable(res){
+  const tb = document.querySelector('#summaryTable tbody');
+  tb.innerHTML='';
+  res.list.forEach((r,i)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i+1}</td><td>${r.name}</td><td class="num">-</td><td class="num">${fmtNum(r.total)}</td><td class="num">${fmtNum(r.afterDeduct)}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function renderGtPickLists(){
+  const c1 = document.getElementById('coc1Pick');
+  const hp = document.getElementById('hcpmPick');
+  const all = CONFIG.staffMaster.slice().sort((a,b)=>a.name.localeCompare(b.name,'vi'));
+  if(!all.length){
+    c1.innerHTML = '<p class="muted">(danh mục nhân viên đang trống — vào tab Danh mục &amp; đơn giá để thêm)</p>';
+    hp.innerHTML = c1.innerHTML;
+    return;
+  }
+  c1.innerHTML = all.map(s=>`<label data-name="${s.name.toLowerCase()}"><input type="checkbox" class="c1chk" value="${s.name}" ${s.coc1?'checked':''}> ${s.name}</label>`).join('');
+  hp.innerHTML = all.map(s=>`<label data-name="${s.name.toLowerCase()}"><input type="checkbox" class="hpchk" value="${s.name}" ${s.hcpm?'checked':''}> ${s.name}</label>`).join('');
+  filterPickList('coc1Pick', document.getElementById('coc1Search').value);
+  filterPickList('hcpmPick', document.getElementById('hcpmSearch').value);
+}
+
+function filterPickList(containerId, query){
+  const q = (query||'').trim().toLowerCase();
+  document.querySelectorAll('#'+containerId+' label').forEach(l=>{
+    l.style.display = (!q || (l.dataset.name||'').includes(q)) ? '' : 'none';
+  });
+}
+
+function computeGT(){
+  if(!CURRENT_SUMMARY){ toast('Hãy tính bảng tổng hợp trước.'); return; }
+  const byName = {};
+  CURRENT_SUMMARY.list.forEach(x=> byName[x.name]=x.afterDeduct);
+  const c1sel = Array.from(document.querySelectorAll('.c1chk:checked')).map(x=>x.value);
+  const hpsel = Array.from(document.querySelectorAll('.hpchk:checked')).map(x=>x.value);
+  const avg = (names)=>{
+    const vals = names.map(n=>byName[n]||0).filter(v=>v>0);
+    if(!vals.length) return 0;
+    return vals.reduce((a,b)=>a+b,0)/vals.length;
+  };
+  const dtAvg = avg(c1sel);
+  const hcpmAvg = avg(hpsel);
+  const hchsAvg = hcpmAvg/2;
+  const tb = document.querySelector('#gtTable tbody');
+  tb.innerHTML='';
+  const rows = [
+    ['Điều dưỡng trưởng', dtAvg, `TB nhóm Cọc 1 (${c1sel.length} người, đã trừ ${CONFIG.deductPct}%)`],
+    ['Nhân viên hành chính phòng mổ', hcpmAvg, `TB nhóm Hành chính phòng mổ (${hpsel.length} người, đã trừ ${CONFIG.deductPct}%)`],
+    ['Nhân viên hành chính Hồi sức', hchsAvg, '= ½ mức Hành chính phòng mổ'],
+  ];
+  CONFIG.staffMaster.filter(s=>s.giantiep).forEach(g=>{
+    let amount, note;
+    switch(g.gtMode){
+      case 'dt': amount = dtAvg; note = 'Hưởng bằng mức Điều dưỡng trưởng'; break;
+      case 'hcpm': amount = hcpmAvg; note = 'Hưởng bằng mức Hành chính phòng mổ'; break;
+      case 'hchs': amount = hchsAvg; note = 'Hưởng bằng mức Hành chính Hồi sức (½ HC phòng mổ)'; break;
+      default: amount = hcpmAvg*(g.gtHeso||1); note = `Hệ số ${g.gtHeso||1} × Hành chính phòng mổ`;
+    }
+    rows.push([g.name, amount, note]);
+  });
+  rows.forEach(r=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r[0]}</td><td class="num">${fmtNum(r[1])}</td><td class="muted">${r[2]}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+/* ============================================================
+   EXPORT
+   ============================================================ */
+function exportExcel(){
+  if(!CURRENT_SUMMARY){ toast('Hãy tính bảng tổng hợp trước.'); return; }
+  const from = document.getElementById('sumFrom').value, to = document.getElementById('sumTo').value;
+  const wsData = [
+    ['SỞ Y TẾ TỈNH GIA LAI'],
+    ['BỆNH VIỆN ĐA KHOA TRUNG TÂM'],
+    [`BẢNG TỔNG HỢP BỒI DƯỠNG PHẪU THUẬT - THỦ THUẬT (${from} đến ${to})`],
+    [],
+    ['STT','Họ tên','Tổng tiền (chưa trừ %)','Tổng tiền (đã trừ '+CONFIG.deductPct+'%)']
+  ];
+  CURRENT_SUMMARY.list.forEach((r,i)=> wsData.push([i+1, r.name, r.total, Math.round(r.afterDeduct)]));
+  wsData.push([]);
+  wsData.push(['BỘ PHẬN GIÁN TIẾP']);
+  document.querySelectorAll('#gtTable tbody tr').forEach(tr=>{
+    const tds = tr.querySelectorAll('td');
+    wsData.push([tds[0].textContent, tds[1].textContent.replace(/\./g,'').replace(' đ','')]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [{wch:6},{wch:28},{wch:22},{wch:22}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Tong hop');
+  XLSX.writeFile(wb, `BangBoiDuong_${from}_${to}.xlsx`);
+  toast('Đã xuất file Excel.');
+}
+
+function exportWord(){
+  if(!CURRENT_SUMMARY){ toast('Hãy tính bảng tổng hợp trước.'); return; }
+  const from = document.getElementById('sumFrom').value, to = document.getElementById('sumTo').value;
+  let rowsHtml = CURRENT_SUMMARY.list.map((r,i)=>`<tr><td>${i+1}</td><td>${r.name}</td><td align="right">${fmtNum(r.total)}</td><td align="right">${fmtNum(r.afterDeduct)}</td></tr>`).join('');
+  let gtHtml = Array.from(document.querySelectorAll('#gtTable tbody tr')).map(tr=>{
+    const tds = tr.querySelectorAll('td');
+    return `<tr><td>${tds[0].textContent}</td><td align="right">${tds[1].textContent}</td><td>${tds[2].textContent}</td></tr>`;
+  }).join('');
+  const html = `
+  <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+  <head><meta charset="utf-8"><style>
+    body{font-family:"Times New Roman", serif; font-size:13pt;}
+    table{border-collapse:collapse; width:100%;}
+    td,th{border:1px solid #000; padding:4px 6px;}
+    th{background:#dfe7ef;}
+    .center{text-align:center;}
+  </style></head>
+  <body>
+    <p class="center"><b>SỞ Y TẾ TỈNH GIA LAI</b><br><b>BỆNH VIỆN ĐA KHOA TRUNG TÂM</b></p>
+    <p class="center"><b>BẢNG TỔNG HỢP BỒI DƯỠNG PHẪU THUẬT – THỦ THUẬT</b><br>Từ ngày ${from} đến ngày ${to}</p>
+    <table>
+      <tr><th>STT</th><th>Họ và tên</th><th>Tổng tiền (chưa trừ %)</th><th>Tổng tiền (đã trừ ${CONFIG.deductPct}%)</th></tr>
+      ${rowsHtml}
+    </table>
+    <p><b>BẢNG CHI BỘ PHẬN GIÁN TIẾP</b></p>
+    <table>
+      <tr><th>Chức danh / Nhân viên</th><th>Số tiền</th><th>Ghi chú</th></tr>
+      ${gtHtml}
+    </table>
+    <br><table style="border:none;"><tr style="border:none;">
+      <td style="border:none;width:50%;" class="center">Người lập bảng</td>
+      <td style="border:none;width:50%;" class="center">Trưởng khoa</td>
+    </tr></table>
+  </body></html>`;
+  const blob = new Blob(['\ufeff', html], {type:'application/msword'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `BangBoiDuong_${from}_${to}.doc`;
+  link.click();
+  toast('Đã xuất file Word.');
+}
+
+/* ============================================================
+   STATS TAB
+   ============================================================ */
+function barChart(container, data, maxItems, colorVar){
+  const max = Math.max(...data.map(d=>d.v), 1);
+  container.innerHTML = data.slice(0,maxItems).map(d=>`
+    <div class="bar-row">
+      <div class="name">${d.n}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(d.v/max*100).toFixed(1)}%;"></div></div>
+      <div class="bar-val">${fmtNum(d.v)}</div>
+    </div>`).join('') || '<p class="muted">Chưa có dữ liệu — hãy tính bảng tổng hợp ở tab 3 trước.</p>';
+}
+
+let MONTHLY_CACHE = null;
+
+async function computeMonthlyBreakdown(){
+  const allBatches = [];
+  for(const meta of BATCH_INDEX){
+    const b = await sGet('batch:'+meta.id);
+    if(b) allBatches.push(b);
+  }
+  const perStaffMonth = {}; // name -> {month: amount}
+  const totalMonth = {}; // 'YYYY-MM' -> amount
+  allBatches.forEach(batch=>{
+    batch.rows.forEach(r=>{
+      const d = parseVNDate(r.ngay);
+      if(!d) return;
+      const month = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      const cChinh = rateFor(r.loaiP,'chinh'), cPhu = rateFor(r.loaiP,'phu'), cGiup = rateFor(r.loaiP,'giup');
+      const excluded = excludedFieldsForRow(r);
+      const entries = [['chinh1',r.chinh1,cChinh],['chinh2',r.chinh2,cChinh],['phu1',r.phu1,cPhu],['phu2',r.phu2,cPhu],['phu3',r.phu3,cPhu],['phu4',r.phu4,cPhu],['giup1',r.giup1,cGiup]];
+      entries.forEach(([key,name,rate])=>{
+        if(!name || excluded.has(key)) return;
+        name = name.trim(); if(!name) return;
+        perStaffMonth[name] = perStaffMonth[name]||{};
+        perStaffMonth[name][month] = (perStaffMonth[name][month]||0)+rate;
+        totalMonth[month] = (totalMonth[month]||0)+rate;
+      });
+    });
+  });
+  return {perStaffMonth, totalMonth};
+}
+
+function renderMonthlyChart(){
+  if(!MONTHLY_CACHE) return;
+  const sel = document.getElementById('monthlyStaffSelect').value;
+  const src = sel ? (MONTHLY_CACHE.perStaffMonth[sel]||{}) : MONTHLY_CACHE.totalMonth;
+  const months = Object.keys(src).sort();
+  const data = months.map(m=>({n:m, v:src[m]}));
+  barChart(document.getElementById('monthlyChart'), data, 24);
+  const total = months.reduce((s,m)=>s+src[m],0);
+  const avg = months.length ? total/months.length : 0;
+  document.getElementById('monthlyKpi').innerHTML = `
+    <div class="kpi"><div class="v">${months.length}</div><div class="l">Số tháng có dữ liệu</div></div>
+    <div class="kpi"><div class="v">${fmtNum(total)}</div><div class="l">Tổng thu (đồng)</div></div>
+    <div class="kpi"><div class="v">${fmtNum(avg)}</div><div class="l">Trung bình / tháng</div></div>
+  `;
+}
+
+async function renderMonthlyStats(){
+  MONTHLY_CACHE = await computeMonthlyBreakdown();
+  const sel = document.getElementById('monthlyStaffSelect');
+  const prevVal = sel.value;
+  const names = Object.keys(MONTHLY_CACHE.perStaffMonth).sort((a,b)=>a.localeCompare(b,'vi'));
+  sel.innerHTML = '<option value="">— Tất cả nhân viên (tổng khoa) —</option>' + names.map(n=>`<option value="${n}">${n}</option>`).join('');
+  sel.value = names.includes(prevVal) ? prevVal : '';
+  renderMonthlyChart();
+}
+
+async function renderStats(){
+  await renderMonthlyStats();
+  if(!CURRENT_SUMMARY){
+    document.getElementById('topChart').innerHTML = '<p class="muted">Hãy tính bảng tổng hợp ở tab "Bảng tổng hợp" trước.</p>';
+    document.getElementById('typeChart').innerHTML='';
+    document.getElementById('loaipChart').innerHTML='';
+    document.getElementById('trendChart').innerHTML='';
+    return;
+  }
+  const top = CURRENT_SUMMARY.list.slice(0,10).map(x=>({n:x.name, v:x.total}));
+  barChart(document.getElementById('topChart'), top, 10);
+
+  barChart(document.getElementById('typeChart'), [
+    {n:'Phẫu thuật', v:CURRENT_SUMMARY.totalPT},
+    {n:'Thủ thuật', v:CURRENT_SUMMARY.totalTT}
+  ], 2);
+
+  const loaiPData = Object.keys(CURRENT_SUMMARY.loaiPCount).sort((a,b)=>CURRENT_SUMMARY.loaiPCount[b]-CURRENT_SUMMARY.loaiPCount[a])
+    .map(k=>({n:k, v:CURRENT_SUMMARY.loaiPCount[k]}));
+  barChart(document.getElementById('loaipChart'), loaiPData, 10);
+
+  const trendData = Object.keys(CURRENT_SUMMARY.perBatchTotal).map(id=>{
+    const meta = BATCH_INDEX.find(b=>b.id===id);
+    return {n: meta? (meta.note||meta.filename) : id, v: CURRENT_SUMMARY.perBatchTotal[id]};
+  });
+  barChart(document.getElementById('trendChart'), trendData, 20);
+}
+
+init();
+</script>
+</body>
+</html>
