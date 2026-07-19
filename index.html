@@ -351,6 +351,13 @@
         <div class="col"><label>Từ ngày</label><input type="date" id="sumFrom"></div>
         <div class="col"><label>Đến ngày</label><input type="date" id="sumTo"></div>
         <div class="col" style="flex:0;"><button class="btn" id="btnCompute">⟳ Tính tổng hợp</button></div>
+        <div class="col" style="max-width:220px;">
+          <label>Khi xuất file</label>
+          <select id="exportGroupMode">
+            <option value="total">Chỉ tổng cộng</option>
+            <option value="detail">Chi tiết theo nhóm GM/DC</option>
+          </select>
+        </div>
         <div class="col" style="flex:0;"><button class="btn secondary" id="btnExportExcel">⬇ Xuất Excel</button></div>
         <div class="col" style="flex:0;"><button class="btn secondary" id="btnExportWord">⬇ Xuất Word</button></div>
       </div>
@@ -360,8 +367,13 @@
 
     <div class="card">
       <h2>Bảng tổng hợp tiền bồi dưỡng cá nhân (sắp xếp giảm dần)</h2>
+      <div class="row" style="align-items:center; margin-bottom:6px;">
+        <label style="display:inline-flex; align-items:center; gap:6px; width:auto;">
+          <input type="checkbox" id="showGroupCols" style="width:auto;"> Hiện chi tiết theo nhóm Gây mê (GM) / Dụng cụ (DC)
+        </label>
+      </div>
       <div style="overflow:auto;"><table class="data" id="summaryTable">
-        <thead><tr><th>STT</th><th>Họ tên</th><th class="num">Tiền Gây mê (GM)</th><th class="num">Tiền Dụng cụ (DC)</th><th class="num">Tổng tiền (chưa trừ %)</th><th class="num">Tổng tiền (đã trừ %)</th></tr></thead>
+        <thead><tr><th>STT</th><th>Họ tên</th><th class="num gmdc-col" style="display:none;">Tiền Gây mê (GM)</th><th class="num gmdc-col" style="display:none;">Tiền Dụng cụ (DC)</th><th class="num">Tổng tiền (chưa trừ %)</th><th class="num">Tổng tiền (đã trừ %)</th></tr></thead>
         <tbody></tbody>
       </table></div>
     </div>
@@ -380,12 +392,24 @@
       <div id="giantiepSelectHint" class="muted" style="margin-bottom:8px;">Tick chọn nhân viên áp dụng cho từng nhóm trong đợt tính này (mặc định lấy theo danh mục cấu hình).</div>
       <div class="row">
         <div class="col"><h3>Cọc 1 (chọn để tính Điều dưỡng trưởng)</h3>
-          <input type="text" id="coc1Search" placeholder="Tìm tên để chọn..." style="margin-bottom:6px;">
+          <div class="row" style="align-items:center; margin-bottom:6px; gap:8px;">
+            <input type="text" id="coc1Search" placeholder="Tìm tên để chọn...">
+            <label style="display:inline-flex; align-items:center; gap:5px; width:auto; white-space:nowrap;">
+              <input type="checkbox" id="coc1OnlySelected" style="width:auto;"> Chỉ hiện đã chọn
+            </label>
+          </div>
           <div id="coc1Pick" class="checklist"></div>
+          <div class="muted" id="coc1CountInfo" style="margin-top:4px;"></div>
         </div>
         <div class="col"><h3>Hành chính phòng mổ (chọn để tính)</h3>
-          <input type="text" id="hcpmSearch" placeholder="Tìm tên để chọn..." style="margin-bottom:6px;">
+          <div class="row" style="align-items:center; margin-bottom:6px; gap:8px;">
+            <input type="text" id="hcpmSearch" placeholder="Tìm tên để chọn...">
+            <label style="display:inline-flex; align-items:center; gap:5px; width:auto; white-space:nowrap;">
+              <input type="checkbox" id="hcpmOnlySelected" style="width:auto;"> Chỉ hiện đã chọn
+            </label>
+          </div>
           <div id="hcpmPick" class="checklist"></div>
+          <div class="muted" id="hcpmCountInfo" style="margin-top:4px;"></div>
         </div>
       </div>
       <div style="margin-top:10px;"><button class="btn secondary small" id="btnRecalcGT">⟳ Tính lại bộ phận gián tiếp</button></div>
@@ -833,9 +857,12 @@ function setupImport(){
   });
 }
 
+let QUEUE_TOTAL = 0, QUEUE_DONE = 0;
 function handleFiles(fileList){
   const files = Array.from(fileList);
   if(!files.length) return;
+  QUEUE_TOTAL = files.length;
+  QUEUE_DONE = 0;
   // process one at a time (queue)
   processNext(files, 0);
 }
@@ -845,6 +872,7 @@ function processNext(files, i){
   const ext = (file.name.split('.').pop()||'').toLowerCase();
   if(!['xlsx','xls','csv'].includes(ext)){
     toast(`Không hỗ trợ định dạng ".${ext}" (${file.name}) — chỉ nhận .xlsx, .xls, .csv. Hãy xuất lại từ HIS ra Excel/CSV.`);
+    QUEUE_DONE++;
     processNext(files, i+1);
     return;
   }
@@ -855,15 +883,17 @@ function processNext(files, i){
       // Chặn file PDF thật bị đổi tên đuôi thành .xls/.xlsx/.csv (kiểm tra chữ ký "%PDF")
       if(data.length>4 && data[0]===0x25 && data[1]===0x50 && data[2]===0x44 && data[3]===0x46){
         toast(`"${file.name}" thực chất là file PDF (chỉ đổi tên đuôi), không phải Excel/CSV thật — không đọc được. Hãy xuất file Excel/CSV gốc từ HIS.`);
+        QUEUE_DONE++;
         processNext(files, i+1);
         return;
       }
       const wb = XLSX.read(data, {type:'array'});
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const allRows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:false, defval:''});
-      if(!allRows.length){ toast('File rỗng: '+file.name); processNext(files,i+1); return; }
+      if(!allRows.length){ toast('File rỗng: '+file.name); QUEUE_DONE++; processNext(files,i+1); return; }
       const headerRowIdx = guessHeaderRowIndex(allRows);
-      PENDING = {allRows, headerRowIdx, filename:file.name, profileKey:guessProfileKey(file.name)};
+      QUEUE_DONE++;
+      PENDING = {allRows, headerRowIdx, filename:file.name, profileKey:guessProfileKey(file.name), queuePos:QUEUE_DONE, queueTotal:QUEUE_TOTAL};
       applyHeaderRow();
       openMappingUI();
       // queue remaining files to process after this one is saved
@@ -871,6 +901,7 @@ function processNext(files, i){
     }catch(err){
       toast('Không đọc được file: '+file.name);
       console.error(err);
+      QUEUE_DONE++;
       processNext(files,i+1);
     }
   };
@@ -929,9 +960,11 @@ function renderHeaderRowPreview(){
 
 function openMappingUI(){
   document.getElementById('mapFileName').textContent = PENDING.filename;
-  document.getElementById('mapProfileLabel').textContent = `(nhận diện: báo cáo "${PROFILE_LABELS[PENDING.profileKey]}")`;
+  const queueTxt = (PENDING.queueTotal>1) ? ` — File ${PENDING.queuePos}/${PENDING.queueTotal} trong hàng đợi` : '';
+  document.getElementById('mapProfileLabel').textContent = `(nhận diện: báo cáo "${PROFILE_LABELS[PENDING.profileKey]}")${queueTxt}`;
   document.getElementById('profileSelect').value = PENDING.profileKey;
   document.getElementById('mappingCard').style.display='block';
+  document.getElementById('mappingCard').scrollIntoView({behavior:'smooth', block:'start'});
   document.getElementById('headerRowInput').value = PENDING.headerRowIdx+1;
   renderHeaderRowPreview();
   rebuildMapGrid();
@@ -1025,6 +1058,13 @@ async function saveBatchFromMapping(){
   const from = document.getElementById('batchFrom').value;
   const to = document.getElementById('batchTo').value;
   if(!from || !to){ toast('Vui lòng nhập khoảng ngày cho đợt này.'); return; }
+
+  const dup = BATCH_INDEX.find(b=> b.filename===PENDING.filename && b.from===from && b.to===to);
+  if(dup){
+    const proceed = confirm(`⚠ Đã có 1 đợt CÙNG TÊN FILE ("${PENDING.filename}") và CÙNG khoảng ngày (${from} → ${to}) được lưu trước đó (${dup.count} ca).\n\nCó thể anh đang lưu trùng lặp file này lần nữa (tiền sẽ bị nhân đôi khi tính tổng hợp).\n\nBấm OK nếu chắc chắn đây là file khác/đợt khác cần lưu thêm, hoặc Cancel để huỷ.`);
+    if(!proceed){ toast('Đã huỷ lưu — kiểm tra lại file đang chọn.'); return; }
+  }
+
   const id = 'b_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
   const rows = PENDING.rows.map(r=>{
     const get = (f)=> mapping[f]!=null ? String(r[mapping[f]]||'').trim() : '';
@@ -1048,7 +1088,10 @@ async function saveBatchFromMapping(){
   document.getElementById('batchFrom').value=''; document.getElementById('batchTo').value=''; document.getElementById('batchNote').value='';
   const remaining = PENDING._remaining||[];
   PENDING = null;
-  if(remaining.length) processNext(remaining,0);
+  if(remaining.length){
+    toast(`Đang mở file tiếp theo trong hàng đợi: ${remaining[0].name} (còn ${remaining.length} file)`);
+    processNext(remaining,0);
+  }
 }
 
 function renderBatchList(){
@@ -1461,8 +1504,11 @@ function setupSummaryHandlers(){
   document.getElementById('btnRecalcGT').addEventListener('click', computeGT);
   document.getElementById('btnExportExcel').addEventListener('click', exportExcel);
   document.getElementById('btnExportWord').addEventListener('click', exportWord);
-  document.getElementById('coc1Search').addEventListener('input', e=>filterPickList('coc1Pick', e.target.value));
-  document.getElementById('hcpmSearch').addEventListener('input', e=>filterPickList('hcpmPick', e.target.value));
+  document.getElementById('coc1Search').addEventListener('input', ()=>applyPickFilter('coc1Pick','coc1Search','coc1OnlySelected','coc1CountInfo'));
+  document.getElementById('hcpmSearch').addEventListener('input', ()=>applyPickFilter('hcpmPick','hcpmSearch','hcpmOnlySelected','hcpmCountInfo'));
+  document.getElementById('coc1OnlySelected').addEventListener('change', ()=>applyPickFilter('coc1Pick','coc1Search','coc1OnlySelected','coc1CountInfo'));
+  document.getElementById('hcpmOnlySelected').addEventListener('change', ()=>applyPickFilter('hcpmPick','hcpmSearch','hcpmOnlySelected','hcpmCountInfo'));
+  document.getElementById('showGroupCols').addEventListener('change', syncGroupColsVisibility);
 }
 
 async function runSummary(){
@@ -1530,9 +1576,15 @@ function renderSummaryTable(res){
   tb.innerHTML='';
   res.list.forEach((r,i)=>{
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${i+1}</td><td>${r.name}</td><td class="num">${fmtNum(r.gm)}</td><td class="num">${fmtNum(r.dc)}</td><td class="num">${fmtNum(r.total)}</td><td class="num">${fmtNum(r.afterDeduct)}</td>`;
+    tr.innerHTML = `<td>${i+1}</td><td>${r.name}</td><td class="num gmdc-col" style="display:none;">${fmtNum(r.gm)}</td><td class="num gmdc-col" style="display:none;">${fmtNum(r.dc)}</td><td class="num">${fmtNum(r.total)}</td><td class="num">${fmtNum(r.afterDeduct)}</td>`;
     tb.appendChild(tr);
   });
+  syncGroupColsVisibility();
+}
+
+function syncGroupColsVisibility(){
+  const show = document.getElementById('showGroupCols').checked;
+  document.querySelectorAll('#summaryTable .gmdc-col').forEach(el=> el.style.display = show ? '' : 'none');
 }
 
 function renderNotInRosterTable(res){
@@ -1562,15 +1614,34 @@ function renderGtPickLists(){
   }
   c1.innerHTML = all.map(s=>`<label data-name="${s.name.toLowerCase()}"><input type="checkbox" class="c1chk" value="${s.name}" ${s.coc1?'checked':''}> ${s.name}</label>`).join('');
   hp.innerHTML = all.map(s=>`<label data-name="${s.name.toLowerCase()}"><input type="checkbox" class="hpchk" value="${s.name}" ${s.hcpm?'checked':''}> ${s.name}</label>`).join('');
-  filterPickList('coc1Pick', document.getElementById('coc1Search').value);
-  filterPickList('hcpmPick', document.getElementById('hcpmSearch').value);
+  c1.querySelectorAll('input[type=checkbox]').forEach(cb=> cb.addEventListener('change', ()=>applyPickFilter('coc1Pick','coc1Search','coc1OnlySelected','coc1CountInfo')));
+  hp.querySelectorAll('input[type=checkbox]').forEach(cb=> cb.addEventListener('change', ()=>applyPickFilter('hcpmPick','hcpmSearch','hcpmOnlySelected','hcpmCountInfo')));
+  applyPickFilter('coc1Pick','coc1Search','coc1OnlySelected','coc1CountInfo');
+  applyPickFilter('hcpmPick','hcpmSearch','hcpmOnlySelected','hcpmCountInfo');
 }
 
-function filterPickList(containerId, query){
-  const q = (query||'').trim().toLowerCase();
+function applyPickFilter(containerId, searchId, onlyId, countId){
+  const q = (document.getElementById(searchId).value||'').trim().toLowerCase();
+  const onlySelected = document.getElementById(onlyId).checked;
+  let selectedCount = 0, total = 0;
   document.querySelectorAll('#'+containerId+' label').forEach(l=>{
-    l.style.display = (!q || (l.dataset.name||'').includes(q)) ? '' : 'none';
+    total++;
+    const cb = l.querySelector('input[type=checkbox]');
+    if(cb && cb.checked) selectedCount++;
+    const matchesSearch = !q || (l.dataset.name||'').includes(q);
+    const matchesSelected = !onlySelected || (cb && cb.checked);
+    l.style.display = (matchesSearch && matchesSelected) ? '' : 'none';
   });
+  const info = document.getElementById(countId);
+  if(info) info.textContent = `Đã chọn ${selectedCount} / ${total} người`;
+}
+
+// giữ lại tên cũ để tương thích chỗ khác gọi (VD lần đầu tải danh mục)
+function filterPickList(containerId, query){
+  const searchId = containerId==='coc1Pick' ? 'coc1Search' : 'hcpmSearch';
+  const onlyId = containerId==='coc1Pick' ? 'coc1OnlySelected' : 'hcpmOnlySelected';
+  const countId = containerId==='coc1Pick' ? 'coc1CountInfo' : 'hcpmCountInfo';
+  applyPickFilter(containerId, searchId, onlyId, countId);
 }
 
 function computeGT(){
@@ -1617,14 +1688,20 @@ function computeGT(){
 function exportExcel(){
   if(!CURRENT_SUMMARY){ toast('Hãy tính bảng tổng hợp trước.'); return; }
   const from = document.getElementById('sumFrom').value, to = document.getElementById('sumTo').value;
+  const detail = document.getElementById('exportGroupMode').value==='detail';
+  const header = detail
+    ? ['STT','Họ tên','Tiền Gây mê (GM)','Tiền Dụng cụ (DC)','Tổng tiền (chưa trừ %)','Tổng tiền (đã trừ '+CONFIG.deductPct+'%)']
+    : ['STT','Họ tên','Tổng tiền (chưa trừ %)','Tổng tiền (đã trừ '+CONFIG.deductPct+'%)'];
   const wsData = [
     ['SỞ Y TẾ TỈNH GIA LAI'],
     ['BỆNH VIỆN ĐA KHOA TRUNG TÂM'],
     [`BẢNG TỔNG HỢP BỒI DƯỠNG PHẪU THUẬT - THỦ THUẬT (${from} đến ${to})`],
     [],
-    ['STT','Họ tên','Tiền Gây mê (GM)','Tiền Dụng cụ (DC)','Tổng tiền (chưa trừ %)','Tổng tiền (đã trừ '+CONFIG.deductPct+'%)']
+    header
   ];
-  CURRENT_SUMMARY.list.forEach((r,i)=> wsData.push([i+1, r.name, r.gm, r.dc, r.total, Math.round(r.afterDeduct)]));
+  CURRENT_SUMMARY.list.forEach((r,i)=> wsData.push(
+    detail ? [i+1, r.name, r.gm, r.dc, r.total, Math.round(r.afterDeduct)] : [i+1, r.name, r.total, Math.round(r.afterDeduct)]
+  ));
   wsData.push([]);
   wsData.push(['DANH SÁCH KHÔNG TÍNH TIỀN (NGOÀI DANH MỤC KHOA)']);
   wsData.push(['Mã ca','Ngày','Họ tên','Vai trò','Số tiền']);
@@ -1636,7 +1713,7 @@ function exportExcel(){
     wsData.push([tds[0].textContent, tds[1].textContent.replace(/\./g,'').replace(' đ','')]);
   });
   const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [{wch:6},{wch:28},{wch:18},{wch:18},{wch:22},{wch:22}];
+  ws['!cols'] = detail ? [{wch:6},{wch:28},{wch:18},{wch:18},{wch:22},{wch:22}] : [{wch:6},{wch:28},{wch:22},{wch:22}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Tong hop');
   XLSX.writeFile(wb, `BangBoiDuong_${from}_${to}.xlsx`);
@@ -1646,11 +1723,18 @@ function exportExcel(){
 function exportWord(){
   if(!CURRENT_SUMMARY){ toast('Hãy tính bảng tổng hợp trước.'); return; }
   const from = document.getElementById('sumFrom').value, to = document.getElementById('sumTo').value;
-  let rowsHtml = CURRENT_SUMMARY.list.map((r,i)=>`<tr><td>${i+1}</td><td>${r.name}</td><td align="right">${fmtNum(r.gm)}</td><td align="right">${fmtNum(r.dc)}</td><td align="right">${fmtNum(r.total)}</td><td align="right">${fmtNum(r.afterDeduct)}</td></tr>`).join('');
+  const detail = document.getElementById('exportGroupMode').value==='detail';
+  let rowsHtml = CURRENT_SUMMARY.list.map((r,i)=> detail
+    ? `<tr><td>${i+1}</td><td>${r.name}</td><td align="right">${fmtNum(r.gm)}</td><td align="right">${fmtNum(r.dc)}</td><td align="right">${fmtNum(r.total)}</td><td align="right">${fmtNum(r.afterDeduct)}</td></tr>`
+    : `<tr><td>${i+1}</td><td>${r.name}</td><td align="right">${fmtNum(r.total)}</td><td align="right">${fmtNum(r.afterDeduct)}</td></tr>`
+  ).join('');
   let gtHtml = Array.from(document.querySelectorAll('#gtTable tbody tr')).map(tr=>{
     const tds = tr.querySelectorAll('td');
     return `<tr><td>${tds[0].textContent}</td><td align="right">${tds[1].textContent}</td><td>${tds[2].textContent}</td></tr>`;
   }).join('');
+  const headerRow = detail
+    ? `<tr><th>STT</th><th>Họ và tên</th><th>Tiền Gây mê (GM)</th><th>Tiền Dụng cụ (DC)</th><th>Tổng tiền (chưa trừ %)</th><th>Tổng tiền (đã trừ ${CONFIG.deductPct}%)</th></tr>`
+    : `<tr><th>STT</th><th>Họ và tên</th><th>Tổng tiền (chưa trừ %)</th><th>Tổng tiền (đã trừ ${CONFIG.deductPct}%)</th></tr>`;
   const html = `
   <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
   <head><meta charset="utf-8"><style>
@@ -1664,7 +1748,7 @@ function exportWord(){
     <p class="center"><b>SỞ Y TẾ TỈNH GIA LAI</b><br><b>BỆNH VIỆN ĐA KHOA TRUNG TÂM</b></p>
     <p class="center"><b>BẢNG TỔNG HỢP BỒI DƯỠNG PHẪU THUẬT – THỦ THUẬT</b><br>Từ ngày ${from} đến ngày ${to}</p>
     <table>
-      <tr><th>STT</th><th>Họ và tên</th><th>Tiền Gây mê (GM)</th><th>Tiền Dụng cụ (DC)</th><th>Tổng tiền (chưa trừ %)</th><th>Tổng tiền (đã trừ ${CONFIG.deductPct}%)</th></tr>
+      ${headerRow}
       ${rowsHtml}
     </table>
     <p><b>DANH SÁCH KHÔNG TÍNH TIỀN (NGOÀI DANH MỤC KHOA)</b></p>
