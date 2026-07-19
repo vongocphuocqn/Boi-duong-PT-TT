@@ -386,6 +386,7 @@
         </div>
         <div class="col" style="flex:0; align-self:end;"><button class="btn secondary small" id="btnExportExcel2" type="button">⬇ Xuất Excel</button></div>
         <div class="col" style="flex:0; align-self:end;"><button class="btn secondary small" id="btnExportWord2" type="button">⬇ Xuất Word</button></div>
+        <div class="col" style="flex:0; align-self:end;"><button class="btn secondary small" id="btnExportZalo" type="button">⬇ Xuất gọn (gửi Zalo)</button></div>
       </div>
       <div style="overflow:auto;"><table class="data" id="summaryTable">
         <thead><tr><th>STT</th><th>Họ tên</th><th class="num gmdc-col">Tiền Gây mê (GM)</th><th class="num gmdc-col">Tiền Dụng cụ (DC)</th><th class="num">Tổng tiền (chưa trừ %)</th><th class="num">Tổng tiền (đã trừ %)</th></tr></thead>
@@ -1551,6 +1552,7 @@ function setupSummaryHandlers(){
   document.getElementById('btnExportWord2').addEventListener('click', exportWord);
   document.getElementById('exportGroupMode').addEventListener('change', e=>{ document.getElementById('exportGroupMode2').value = e.target.value; });
   document.getElementById('exportGroupMode2').addEventListener('change', e=>{ document.getElementById('exportGroupMode').value = e.target.value; });
+  document.getElementById('btnExportZalo').addEventListener('click', exportZaloStyle);
   document.getElementById('coc1Search').addEventListener('input', ()=>applyPickFilter('coc1Pick','coc1Search','coc1OnlySelected','coc1CountInfo'));
   document.getElementById('hcpmSearch').addEventListener('input', ()=>applyPickFilter('hcpmPick','hcpmSearch','hcpmOnlySelected','hcpmCountInfo'));
   document.getElementById('coc1OnlySelected').addEventListener('change', ()=>applyPickFilter('coc1Pick','coc1Search','coc1OnlySelected','coc1CountInfo'));
@@ -1799,6 +1801,54 @@ function exportExcel(){
   XLSX.utils.book_append_sheet(wb, ws, 'Tong hop');
   XLSX.writeFile(wb, `BangBoiDuong_${from}_${to}.xlsx`);
   toast('Đã xuất file Excel.');
+}
+
+function rankWithTies(sortedDescList, valueKey){
+  // Xếp hạng kiểu "chuẩn": giá trị bằng nhau thì cùng hạng, hạng tiếp theo tính theo vị trí (bỏ số bị trùng)
+  const ranks = [];
+  sortedDescList.forEach((item,i)=>{
+    if(i>0 && item[valueKey]===sortedDescList[i-1][valueKey]) ranks.push(ranks[i-1]);
+    else ranks.push(i+1);
+  });
+  return ranks;
+}
+
+function exportZaloStyle(){
+  if(!CURRENT_SUMMARY){ toast('Hãy tính bảng tổng hợp trước.'); return; }
+  const from = document.getElementById('sumFrom').value, to = document.getElementById('sumTo').value;
+  const gmList = CURRENT_SUMMARY.list.filter(r=>r.gm>0).map(r=>({name:r.name, total:r.gm, con:Math.round(r.gm*(1-CONFIG.deductPct/100))})).sort((a,b)=>b.total-a.total);
+  const dcList = CURRENT_SUMMARY.list.filter(r=>r.dc>0).map(r=>({name:r.name, total:r.dc, con:Math.round(r.dc*(1-CONFIG.deductPct/100))})).sort((a,b)=>b.total-a.total);
+  const gmRanks = rankWithTies(gmList, 'total');
+  const dcRanks = rankWithTies(dcList, 'total');
+
+  const maxRows = Math.max(gmList.length, dcList.length);
+  const title = `Từ ${from||'?'} đến ${to||'?'}`;
+  const wsData = [
+    [title, '', '', '', '', title, '', '', ''],
+    ['TÊN','TOTAL','CÒN','HẠNG','', 'TÊN','TOTAL','CÒN','HẠNG']
+  ];
+  let sumGmTotal=0, sumGmCon=0, sumDcTotal=0, sumDcCon=0;
+  for(let i=0;i<maxRows;i++){
+    const g = gmList[i], d = dcList[i];
+    if(g){ sumGmTotal+=g.total; sumGmCon+=g.con; }
+    if(d){ sumDcTotal+=d.total; sumDcCon+=d.con; }
+    wsData.push([
+      g?g.name:'', g?g.total:'', g?g.con:'', g?gmRanks[i]:'', '',
+      d?d.name:'', d?d.total:'', d?d.con:'', d?dcRanks[i]:''
+    ]);
+  }
+  wsData.push(['','','','','','','','','']);
+  wsData.push(['TỔNG', sumGmTotal, sumGmCon, '', '', 'TỔNG', sumDcTotal, sumDcCon, '']);
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [{wch:16},{wch:13},{wch:13},{wch:7},{wch:3},{wch:16},{wch:13},{wch:13},{wch:7}];
+  ws['!merges'] = [
+    {s:{r:0,c:0}, e:{r:0,c:3}}, {s:{r:0,c:5}, e:{r:0,c:8}}
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'GM-DC');
+  XLSX.writeFile(wb, `BoiDuong_GM_DC_${from}_${to}.xlsx`);
+  toast('Đã xuất file gọn — mở lên chụp ảnh hoặc gửi trực tiếp qua Zalo.');
 }
 
 function exportWord(){
