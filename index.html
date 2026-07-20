@@ -425,6 +425,14 @@
             <option value="monthrange">Khoảng tháng (có trung bình/tháng)</option>
           </select>
         </div>
+        <div class="col" style="max-width:200px;">
+          <label>Bảng gọn (Zalo) — in nhóm nào</label>
+          <select id="zaloGroupMode">
+            <option value="all">Tất cả (GM + DC, 2 cột)</option>
+            <option value="gm">Chỉ Gây mê (GM)</option>
+            <option value="dc">Chỉ Dụng cụ (DC)</option>
+          </select>
+        </div>
         <div class="col zalo-month-only" style="max-width:180px; display:none;">
           <label>Tháng</label>
           <input type="month" id="zaloMonth">
@@ -2147,10 +2155,54 @@ function buildZaloLists(res, numMonths){
 async function exportZaloExcel(){
   const ctx = await getZaloRangeAndSummary();
   if(!ctx) return;
+  const groupMode = document.getElementById('zaloGroupMode').value; // all|gm|dc
   const {gmList, dcList, gmRanks, dcRanks} = buildZaloLists(ctx.res, ctx.numMonths);
   const showTB = ctx.numMonths>1;
-  const maxRows = Math.max(gmList.length, dcList.length);
   const headerL = showTB ? ['TÊN','TOTAL','CÒN','TB/THÁNG','HẠNG'] : ['TÊN','TOTAL','CÒN','HẠNG'];
+  const groupLabel = groupMode==='gm' ? ' — Gây mê (GM)' : groupMode==='dc' ? ' — Dụng cụ (DC)' : '';
+
+  if(groupMode!=='all'){
+    const list = groupMode==='gm' ? gmList : dcList;
+    const ranks = groupMode==='gm' ? gmRanks : dcRanks;
+    const wsData = [
+      [ctx.label+groupLabel],
+      headerL
+    ];
+    let sumTotal=0, sumCon=0;
+    list.forEach((it,i)=>{
+      sumTotal+=it.total; sumCon+=it.con;
+      wsData.push(showTB?[it.shortName,it.total,it.con,it.tb,ranks[i]]:[it.shortName,it.total,it.con,ranks[i]]);
+    });
+    wsData.push(showTB?['TỔNG',sumTotal,sumCon,Math.round(sumTotal/ctx.numMonths),'']:['TỔNG',sumTotal,sumCon,'']);
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const nCols = headerL.length;
+    const colWidths = [{wch:18},{wch:14},{wch:14}]; if(showTB) colWidths.push({wch:11}); colWidths.push({wch:7});
+    ws['!cols'] = colWidths;
+    ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:nCols-1}}];
+    for(let R=2; R<wsData.length; R++){
+      [1,2,3].forEach(C=>{
+        const addr = XLSX.utils.encode_cell({r:R,c:C});
+        if(ws[addr] && typeof ws[addr].v === 'number') ws[addr].z = '#,##0';
+      });
+    }
+    const thin = {style:'thin', color:{rgb:'444444'}};
+    const lastRow = wsData.length-1;
+    for(let r=1;r<=lastRow;r++){
+      for(let c=0;c<nCols;c++){
+        const addr = XLSX.utils.encode_cell({r,c});
+        if(!ws[addr]) ws[addr] = {t:'s', v:''};
+        ws[addr].s = ws[addr].s || {};
+        ws[addr].s.border = { top:r===1?undefined:thin, bottom:r===lastRow?undefined:thin, left:c===0?undefined:thin, right:c===nCols-1?undefined:thin };
+      }
+    }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, groupMode.toUpperCase());
+    XLSX.writeFile(wb, `BoiDuong_${groupMode.toUpperCase()}_${ctx.from}_${ctx.to}.xlsx`);
+    toast('Đã xuất file Excel gọn — mở lên chụp ảnh hoặc gửi trực tiếp qua Zalo.');
+    return;
+  }
+
+  const maxRows = Math.max(gmList.length, dcList.length);
   const gap = [''];
   const headerR = headerL;
   const wsData = [
@@ -2217,26 +2269,65 @@ async function exportZaloExcel(){
 async function exportZaloWord(){
   const ctx = await getZaloRangeAndSummary();
   if(!ctx) return;
+  const groupMode = document.getElementById('zaloGroupMode').value; // all|gm|dc
   const {gmList, dcList, gmRanks, dcRanks} = buildZaloLists(ctx.res, ctx.numMonths);
   const showTB = ctx.numMonths>1;
   const nDataCols = showTB ? 5 : 4;
   const headerCells = showTB
     ? '<th>TÊN</th><th>TOTAL</th><th>CÒN</th><th>TB/THÁNG</th><th>HẠNG</th>'
     : '<th>TÊN</th><th>TOTAL</th><th>CÒN</th><th>HẠNG</th>';
-  let sumGmTotal=0, sumGmCon=0, sumDcTotal=0, sumDcCon=0;
-  gmList.forEach(g=>{ sumGmTotal+=g.total; sumGmCon+=g.con; });
-  dcList.forEach(d=>{ sumDcTotal+=d.total; sumDcCon+=d.con; });
+  const groupLabel = groupMode==='gm' ? ' — Gây mê (GM)' : groupMode==='dc' ? ' — Dụng cụ (DC)' : '';
 
   const cellsFor = (item, ranks, i)=> item
     ? `<td>${item.shortName}</td><td align="right">${fmtNum(item.total)}</td><td align="right">${fmtNum(item.con)}</td>${showTB?`<td align="right">${fmtNum(item.tb)}</td>`:''}<td align="center">${ranks[i]}</td>`
     : Array(nDataCols).fill('<td></td>').join('');
+
+  let bodyHtml, totalRow, pageSize;
+  if(groupMode!=='all'){
+    const list = groupMode==='gm' ? gmList : dcList;
+    const ranks = groupMode==='gm' ? gmRanks : dcRanks;
+    let sumTotal=0, sumCon=0;
+    list.forEach(it=>{ sumTotal+=it.total; sumCon+=it.con; });
+    bodyHtml = list.map((it,i)=>`<tr>${cellsFor(it,ranks,i)}</tr>`).join('');
+    totalRow = `<tr style="font-weight:bold;"><td>TỔNG</td><td align="right">${fmtNum(sumTotal)}</td><td align="right">${fmtNum(sumCon)}</td>${showTB?`<td align="right">${fmtNum(Math.round(sumTotal/ctx.numMonths))}</td>`:''}<td></td></tr>`;
+    pageSize = '21cm 29.7cm'; // 1 khối dữ liệu -> A4 đứng cho gọn
+    const html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+    <head><meta charset="utf-8"><style>
+      @page{ size: ${pageSize}; margin: 1.5cm; }
+      body{font-family:"Times New Roman", serif; font-size:12pt;}
+      table{border-collapse:collapse;}
+      td, th{border:0.5pt solid #444; padding:3px 8px; white-space:nowrap;}
+      th{font-weight:bold;}
+      .center{text-align:center;}
+    </style></head>
+    <body>
+      <p class="center"><b>${ctx.label}${groupLabel}</b></p>
+      <table>
+        <tr>${headerCells}</tr>
+        ${bodyHtml}
+        ${totalRow}
+      </table>
+    </body></html>`;
+    const blob = new Blob(['\ufeff', html], {type:'application/msword'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `BoiDuong_${groupMode.toUpperCase()}_${ctx.from}_${ctx.to}.doc`;
+    link.click();
+    toast('Đã xuất file Word gọn.');
+    return;
+  }
+
+  let sumGmTotal=0, sumGmCon=0, sumDcTotal=0, sumDcCon=0;
+  gmList.forEach(g=>{ sumGmTotal+=g.total; sumGmCon+=g.con; });
+  dcList.forEach(d=>{ sumDcTotal+=d.total; sumDcCon+=d.con; });
 
   const maxRows = Math.max(gmList.length, dcList.length);
   const bodyRows = [];
   for(let i=0;i<maxRows;i++){
     bodyRows.push(`<tr>${cellsFor(gmList[i],gmRanks,i)}<td class="gap"></td>${cellsFor(dcList[i],dcRanks,i)}</tr>`);
   }
-  const totalRow = `<tr style="font-weight:bold;"><td>TỔNG</td><td align="right">${fmtNum(sumGmTotal)}</td><td align="right">${fmtNum(sumGmCon)}</td>${showTB?`<td align="right">${fmtNum(Math.round(sumGmTotal/ctx.numMonths))}</td>`:''}<td></td><td class="gap"></td><td>TỔNG</td><td align="right">${fmtNum(sumDcTotal)}</td><td align="right">${fmtNum(sumDcCon)}</td>${showTB?`<td align="right">${fmtNum(Math.round(sumDcTotal/ctx.numMonths))}</td>`:''}<td></td></tr>`;
+  const totalRowAll = `<tr style="font-weight:bold;"><td>TỔNG</td><td align="right">${fmtNum(sumGmTotal)}</td><td align="right">${fmtNum(sumGmCon)}</td>${showTB?`<td align="right">${fmtNum(Math.round(sumGmTotal/ctx.numMonths))}</td>`:''}<td></td><td class="gap"></td><td>TỔNG</td><td align="right">${fmtNum(sumDcTotal)}</td><td align="right">${fmtNum(sumDcCon)}</td>${showTB?`<td align="right">${fmtNum(Math.round(sumDcTotal/ctx.numMonths))}</td>`:''}<td></td></tr>`;
 
   const html = `
   <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
@@ -2254,7 +2345,7 @@ async function exportZaloWord(){
     <table>
       <tr>${headerCells}<th class="gap"></th>${headerCells}</tr>
       ${bodyRows.join('')}
-      ${totalRow}
+      ${totalRowAll}
     </table>
   </body></html>`;
   const blob = new Blob(['\ufeff', html], {type:'application/msword'});
