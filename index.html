@@ -155,21 +155,49 @@
 </style>
 </head>
 <body>
+
+<div id="loginGate" style="position:fixed; inset:0; background:var(--navy); display:flex; align-items:center; justify-content:center; z-index:999; font-family:'Times New Roman',Times,serif;">
+  <div style="background:#fffdf8; border-radius:10px; padding:34px 36px; max-width:420px; width:90%; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.35);">
+    <h1 style="font-size:19px; color:var(--navy); margin:0 0 4px;">Bồi dưỡng Phẫu thuật – Thủ thuật</h1>
+    <div class="muted" style="margin-bottom:22px;">Khoa Gây mê Hồi sức — chọn vai trò đăng nhập</div>
+    <div style="display:flex; flex-direction:column; gap:10px; text-align:left;">
+      <label style="margin-bottom:0;">Vai trò</label>
+      <select id="loginRoleSelect">
+        <option value="user">User — nhập/tính/kiểm tra số liệu</option>
+        <option value="admin">Admin — toàn quyền (kể cả Danh mục &amp; đơn giá)</option>
+      </select>
+      <div id="loginPassWrap" style="display:none;">
+        <label>Mật khẩu Admin</label>
+        <input type="password" id="loginPassInput" placeholder="Nhập mật khẩu Admin">
+      </div>
+      <div id="loginError" style="color:var(--bad); font-size:12.5px; display:none;">Sai mật khẩu Admin — thử lại.</div>
+      <button class="btn" id="btnLogin" style="margin-top:6px;">Vào ứng dụng</button>
+      <div class="muted" style="font-size:11.5px; margin-top:4px;">Lưu ý: đây là khoá thao tác mềm để tránh sửa nhầm cấu hình, không phải bảo mật dữ liệu tuyệt đối (ứng dụng chạy phía trình duyệt). Dữ liệu giữa 2 vai trò dùng chung để đối chiếu số liệu.</div>
+    </div>
+  </div>
+</div>
+
 <div class="shell">
   <header class="app">
     <div>
       <h1>Bồi dưỡng Phẫu thuật – Thủ thuật</h1>
       <div class="sub">Theo Nghị định 192/2026/NĐ-CP — Khoa Gây mê Hồi sức</div>
     </div>
-    <div class="sub" id="clockInfo"></div>
-    <div class="sub" id="storageInfo" style="margin-top:4px;"></div>
+    <div style="text-align:right;">
+      <div class="sub" id="clockInfo"></div>
+      <div class="sub" id="storageInfo" style="margin-top:4px;"></div>
+      <div class="sub" style="margin-top:4px;">
+        <span class="pill" id="roleBadge">—</span>
+        <button class="btn secondary small" id="btnLogout" style="margin-left:6px;">Đổi vai trò</button>
+      </div>
+    </div>
   </header>
 
   <div id="storageWarnBanner" style="display:none; background:#fdecea; border:1px solid #e0a599; color:#7a2b20; padding:10px 14px; border-radius:6px; font-size:13.5px; margin-bottom:14px;"></div>
 
   <nav class="tabs">
     <button data-tab="import" class="active">1. Nhập dữ liệu</button>
-    <button data-tab="config">2. Danh mục &amp; đơn giá</button>
+    <button data-tab="config" id="navConfigBtn">2. Danh mục &amp; đơn giá</button>
     <button data-tab="summary">3. Bảng tổng hợp</button>
     <button data-tab="stats">4. Thống kê</button>
   </nav>
@@ -775,7 +803,7 @@ async function testStorageAndWarn(){
 async function sGet(key){
   try{
     if(HAS_ARTIFACT_STORAGE){
-      const r = await window.storage.get(key,false);
+      const r = await window.storage.get(key,true);
       return r ? JSON.parse(r.value) : null;
     } else {
       const raw = localStorage.getItem(LS_PREFIX+key);
@@ -786,7 +814,7 @@ async function sGet(key){
 async function sSet(key,val){
   try{
     if(HAS_ARTIFACT_STORAGE){
-      await window.storage.set(key, JSON.stringify(val), false);
+      await window.storage.set(key, JSON.stringify(val), true);
     } else {
       localStorage.setItem(LS_PREFIX+key, JSON.stringify(val));
     }
@@ -799,7 +827,7 @@ async function sSet(key,val){
 }
 async function sDelete(key){
   try{
-    if(HAS_ARTIFACT_STORAGE) await window.storage.delete(key,false);
+    if(HAS_ARTIFACT_STORAGE) await window.storage.delete(key,true);
     else localStorage.removeItem(LS_PREFIX+key);
   } catch(e){}
 }
@@ -821,7 +849,7 @@ function fmtNum(n){ return Math.round(n||0).toLocaleString('vi-VN'); }
 async function init(){
   document.getElementById('clockInfo').textContent = new Date().toLocaleDateString('vi-VN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   document.getElementById('storageInfo').textContent = HAS_ARTIFACT_STORAGE
-    ? '☁ Dữ liệu lưu trong Claude'
+    ? '☁ Dữ liệu dùng chung Admin/User, lưu trong Claude'
     : '💾 Dữ liệu lưu trên trình duyệt này (không tự đồng bộ sang máy/trình duyệt khác)';
   await testStorageAndWarn();
   const cfg = await sGet('config:main');
@@ -852,7 +880,78 @@ async function init(){
   const first = new Date(now.getFullYear(), now.getMonth(), 1);
   document.getElementById('sumFrom').value = fmtDateInput(first);
   document.getElementById('sumTo').value = fmtDateInput(now);
+  setupLoginGate();
 }
+
+/* ============================================================
+   PHÂN QUYỀN ADMIN / USER
+   - Đây là khoá thao tác mềm phía trình duyệt (ẩn/khoá menu cấu hình),
+     KHÔNG phải cơ chế bảo mật dữ liệu. Đổi mật khẩu Admin bằng cách
+     sửa hằng số ADMIN_PASSWORD bên dưới.
+   ============================================================ */
+const ADMIN_PASSWORD = 'gmhs2026';
+const ROLE_KEY = 'boiduong_pttt_role';
+let CURRENT_ROLE = 'user';
+
+function applyRolePermissions(){
+  const isAdmin = CURRENT_ROLE === 'admin';
+  const badge = document.getElementById('roleBadge');
+  badge.textContent = isAdmin ? '🔑 Admin' : '👤 User';
+  badge.style.background = isAdmin ? '#eef3ee' : 'var(--paper2)';
+  badge.style.borderColor = isAdmin ? 'var(--good)' : 'var(--line)';
+  const navConfigBtn = document.getElementById('navConfigBtn');
+  navConfigBtn.style.display = isAdmin ? '' : 'none';
+  if(!isAdmin){
+    const activeTab = document.querySelector('nav.tabs button.active');
+    if(activeTab && activeTab.dataset.tab==='config'){
+      document.querySelector('nav.tabs button[data-tab="import"]').click();
+    }
+  }
+}
+
+function setupLoginGate(){
+  const gate = document.getElementById('loginGate');
+  const roleSelect = document.getElementById('loginRoleSelect');
+  const passWrap = document.getElementById('loginPassWrap');
+  const passInput = document.getElementById('loginPassInput');
+  const errEl = document.getElementById('loginError');
+
+  roleSelect.addEventListener('change', ()=>{
+    passWrap.style.display = roleSelect.value==='admin' ? '' : 'none';
+    errEl.style.display = 'none';
+  });
+
+  document.getElementById('btnLogin').addEventListener('click', ()=>{
+    const role = roleSelect.value;
+    if(role==='admin' && passInput.value !== ADMIN_PASSWORD){
+      errEl.style.display = 'block';
+      return;
+    }
+    CURRENT_ROLE = role;
+    localStorage.setItem(ROLE_KEY, role);
+    gate.style.display = 'none';
+    passInput.value = '';
+    errEl.style.display = 'none';
+    applyRolePermissions();
+  });
+
+  document.getElementById('btnLogout').addEventListener('click', ()=>{
+    roleSelect.value = CURRENT_ROLE;
+    passWrap.style.display = CURRENT_ROLE==='admin' ? '' : 'none';
+    passInput.value = '';
+    errEl.style.display = 'none';
+    gate.style.display = 'flex';
+  });
+
+  const saved = localStorage.getItem(ROLE_KEY);
+  if(saved==='admin' || saved==='user'){
+    CURRENT_ROLE = saved;
+    gate.style.display = 'none';
+  }
+  applyRolePermissions();
+}
+
+
 
 function migrateStaffConfig(){
   // seed with department roster if empty or in old string format
@@ -1193,11 +1292,11 @@ async function saveBatchFromMapping(){
   const exemptCases = computeBatchExemptions(rows);
   const batch = {
     id, from, to, note:document.getElementById('batchNote').value||'', filename:PENDING.filename,
-    uploadedAt:new Date().toISOString(), rows, exemptCases
+    uploadedAt:new Date().toISOString(), rows, exemptCases, enteredBy:CURRENT_ROLE
   };
   const ok = await sSet('batch:'+id, batch);
   if(!ok){ toast('Lỗi lưu trữ: '+(LAST_STORAGE_ERROR||'không rõ nguyên nhân')+'. Thử lại.'); return; }
-  BATCH_INDEX.push({id, from, to, note:batch.note, uploadedAt:batch.uploadedAt, filename:batch.filename, count:rows.length, exemptCases});
+  BATCH_INDEX.push({id, from, to, note:batch.note, uploadedAt:batch.uploadedAt, filename:batch.filename, count:rows.length, exemptCases, enteredBy:batch.enteredBy});
   await sSet('batches:index', BATCH_INDEX);
   toast(`Đã lưu đợt "${batch.filename}" — ${rows.length} ca${exemptCases.length? `, ${exemptCases.length} trường hợp không tính tiền theo quy tắc miễn trừ`:''}.`);
   renderBatchList();
@@ -1225,7 +1324,7 @@ function renderBatchList(){
     const exempt = b.exemptCases||[];
     const exemptRowsHtml = exempt.map(e=>`<tr><td>${e.caseId||''}</td><td>${e.name}</td><td>${e.ngay||''}</td><td>${e.tenDV||''}</td><td>${e.loaiP||''}</td><td>${FIELD_LABELS[e.field]||e.field}</td><td>${e.maQD||''}</td><td>${e.chinh2||''}</td><td>${e.phu4||''}</td></tr>`).join('');
     wrap.innerHTML = `<div class="b">
-        <div><b>${b.filename}</b> <span class="pill">${b.from} → ${b.to}</span> <span class="muted">${b.count} ca ${b.note?(' · '+b.note):''}</span>
+        <div><b>${b.filename}</b> <span class="pill">${b.from} → ${b.to}</span> <span class="pill">${b.enteredBy==='admin'?'🔑 Admin':'👤 User'}</span> <span class="muted">${b.count} ca ${b.note?(' · '+b.note):''}</span>
           ${exempt.length? `<span class="flag">${exempt.length} ca không tính tiền (miễn trừ)</span>`:''}
         </div>
         <div><button class="btn warn small" data-id="${b.id}">Xoá</button></div>
