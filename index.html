@@ -398,7 +398,7 @@
       <div class="card-body">
       <div class="row" style="align-items:center; margin-bottom:6px;">
         <div class="col" style="max-width:260px;">
-          <label>Xem theo</label>
+          <label>Xem theo (áp dụng cả khi xuất Excel/Word)</label>
           <select id="groupViewMode">
             <option value="all">Tất cả (Gây mê + Dụng cụ)</option>
             <option value="gm">Chỉ Gây mê (GM)</option>
@@ -513,7 +513,7 @@
       <p class="muted">Các trường hợp trong khoảng ngày đã chọn bị loại khỏi tính tiền do khớp quy tắc miễn trừ Mã QĐ (xem/sửa quy tắc ở tab Danh mục &amp; đơn giá). Bảng đầy đủ các trường của ca mổ để đối chiếu với file gốc và file đã cắt tiền theo điều kiện.</p>
       <div style="margin-bottom:8px;"><button class="btn secondary small" id="btnExportExemptExcel" type="button">⬇ Xuất Excel để đối chiếu</button></div>
       <div style="overflow:auto;"><table class="data" id="exemptionCasesTable">
-        <thead><tr><th>Mã ca</th><th>Họ tên</th><th>Ngày BĐ</th><th>Tên dịch vụ</th><th>Loại PTTT</th><th>Cột không tính</th><th>Mã TT50</th><th>Gây mê Chính</th><th>Dụng cụ Vòng Trong</th></tr></thead>
+        <thead><tr><th>Mã ca</th><th>Họ tên</th><th>Ngày BĐ</th><th>Tên dịch vụ</th><th>Loại PTTT</th><th>Cột không tính</th><th>Lý do</th><th>Mã TT50</th><th>Gây mê Chính</th><th>Dụng cụ Vòng Trong</th></tr></thead>
         <tbody></tbody>
       </table></div>
       </div>
@@ -613,6 +613,8 @@ const ROLE_FIELDS = [
   {key:'loaiP',    label:'Loại P (PDB/P1/P2/P3/TDB/T1..)'},
   {key:'maQD',     label:'Mã QĐ (nếu có, để áp quy tắc miễn trừ)'},
   {key:'tenDV',    label:'Tên dịch vụ (tuỳ chọn)'},
+  {key:'pct50',    label:'Cột 50% (nếu có dữ liệu → miễn trừ cả ca, tuỳ chọn)'},
+  {key:'pct80',    label:'Cột 80% (nếu có dữ liệu → miễn trừ cả ca, tuỳ chọn)'},
   {key:'chinh1',   label:'PTTT Chính'},
   {key:'chinh2',   label:'Gây mê / GMHS Chính'},
   {key:'phu1',     label:'PTTT Phụ 1'},
@@ -1260,10 +1262,11 @@ function computeBatchExemptions(rows){
   rows.forEach(r=>{
     const excluded = excludedFieldsForRow(r);
     if(!excluded.size) return;
+    const hasPct5080 = !!((r.pct50 && String(r.pct50).trim()) || (r.pct80 && String(r.pct80).trim()));
     excluded.forEach(fieldKey=>{
       const name = r[fieldKey];
       if(!name) return;
-      list.push({caseId:r.caseId, ngay:r.ngay, name:name.trim(), field:fieldKey, maQD:r.maQD, loaiP:r.loaiP, tenDV:r.tenDV||'', chinh2:r.chinh2||'', phu4:r.phu4||''});
+      list.push({caseId:r.caseId, ngay:r.ngay, name:name.trim(), field:fieldKey, maQD:r.maQD, loaiP:r.loaiP, tenDV:r.tenDV||'', chinh2:r.chinh2||'', phu4:r.phu4||'', reason: hasPct5080 ? '50%/80%' : 'Mã QĐ'});
     });
   });
   return list;
@@ -1286,6 +1289,7 @@ async function saveBatchFromMapping(){
     const get = (f)=> mapping[f]!=null ? String(r[mapping[f]]||'').trim() : '';
     return {
       caseId:get('caseId'), ngay:get('ngay'), loaiP:get('loaiP').toUpperCase(), maQD:get('maQD'), tenDV:get('tenDV'),
+      pct50:get('pct50'), pct80:get('pct80'),
       chinh1:get('chinh1'), chinh2:get('chinh2'), phu1:get('phu1'), phu2:get('phu2'), phu3:get('phu3'), phu4:get('phu4'), giup1:get('giup1')
     };
   }).filter(r=>r.loaiP); // must have a valid tier code to be usable
@@ -1322,7 +1326,7 @@ function renderBatchList(){
   BATCH_INDEX.slice().sort((a,b)=> new Date(b.uploadedAt)-new Date(a.uploadedAt)).forEach(b=>{
     const wrap = document.createElement('div');
     const exempt = b.exemptCases||[];
-    const exemptRowsHtml = exempt.map(e=>`<tr><td>${e.caseId||''}</td><td>${e.name}</td><td>${e.ngay||''}</td><td>${e.tenDV||''}</td><td>${e.loaiP||''}</td><td>${FIELD_LABELS[e.field]||e.field}</td><td>${e.maQD||''}</td><td>${e.chinh2||''}</td><td>${e.phu4||''}</td></tr>`).join('');
+    const exemptRowsHtml = exempt.map(e=>`<tr><td>${e.caseId||''}</td><td>${e.name}</td><td>${e.ngay||''}</td><td>${e.tenDV||''}</td><td>${e.loaiP||''}</td><td>${FIELD_LABELS[e.field]||e.field}</td><td>${e.reason||''}</td><td>${e.maQD||''}</td><td>${e.chinh2||''}</td><td>${e.phu4||''}</td></tr>`).join('');
     wrap.innerHTML = `<div class="b">
         <div><b>${b.filename}</b> <span class="pill">${b.from} → ${b.to}</span> <span class="pill">${b.enteredBy==='admin'?'🔑 Admin':'👤 User'}</span> <span class="muted">${b.count} ca ${b.note?(' · '+b.note):''}</span>
           ${exempt.length? `<span class="flag">${exempt.length} ca không tính tiền (miễn trừ)</span>`:''}
@@ -1332,7 +1336,7 @@ function renderBatchList(){
       ${exempt.length? `<details style="margin:-4px 0 8px 0;">
         <summary class="muted" style="cursor:pointer;">Xem danh sách ${exempt.length} trường hợp không tính tiền của đợt này</summary>
         <div style="overflow:auto;"><table class="data" style="margin-top:6px;">
-          <thead><tr><th>Mã ca</th><th>Họ tên</th><th>Ngày BĐ</th><th>Tên dịch vụ</th><th>Loại PTTT</th><th>Cột không tính</th><th>Mã TT50</th><th>Gây mê Chính</th><th>Dụng cụ Vòng Trong</th></tr></thead>
+          <thead><tr><th>Mã ca</th><th>Họ tên</th><th>Ngày BĐ</th><th>Tên dịch vụ</th><th>Loại PTTT</th><th>Cột không tính</th><th>Lý do</th><th>Mã TT50</th><th>Gây mê Chính</th><th>Dụng cụ Vòng Trong</th></tr></thead>
           <tbody>${exemptRowsHtml}</tbody>
         </table></div>
       </details>`:''}`;
@@ -1593,6 +1597,11 @@ function isProcCode(loaiP){ const t=tierOf(loaiP); return t? t.isProc : false; }
 
 function excludedFieldsForRow(row){
   const excluded = new Set();
+  // Nếu ca có dữ liệu ở cột 50% hoặc 80% -> miễn trừ toàn bộ ca (không tính tiền cho bất kỳ vai trò nào)
+  if((row.pct50 && String(row.pct50).trim()) || (row.pct80 && String(row.pct80).trim())){
+    ['chinh1','chinh2','phu1','phu2','phu3','phu4','giup1'].forEach(f=>excluded.add(f));
+    return excluded;
+  }
   const maQD = row.maQD ? String(row.maQD).trim() : '';
   if(!maQD) return excluded;
   const tier = tierOf(row.loaiP);
@@ -1658,13 +1667,14 @@ function computeEarningsFromBatches(batches, from, to){
       const cPhu = rateFor(r.loaiP,'phu');
       const cGiup = rateFor(r.loaiP,'giup');
       const excluded = excludedFieldsForRow(r);
+      const hasPct5080 = !!((r.pct50 && String(r.pct50).trim()) || (r.pct80 && String(r.pct80).trim()));
       let rowTotal = 0;
       const maybeAdd = (fieldKey, rawName, rate)=>{
         if(!rawName) return;
         const name = rawName.trim();
         if(!name) return;
         if(excluded.has(fieldKey)){
-          exemptions.push({caseId:r.caseId, ngay:r.ngay, name, field:fieldKey, maQD:r.maQD, loaiP:r.loaiP, tenDV:r.tenDV||'', chinh2:r.chinh2||'', phu4:r.phu4||''});
+          exemptions.push({caseId:r.caseId, ngay:r.ngay, name, field:fieldKey, maQD:r.maQD, loaiP:r.loaiP, tenDV:r.tenDV||'', chinh2:r.chinh2||'', phu4:r.phu4||'', reason: hasPct5080 ? '50%/80%' : 'Mã QĐ'});
           return;
         }
         if(!rosterNames.has(name.toLowerCase())){
@@ -1776,12 +1786,12 @@ function renderExemptionCasesTable(res){
   tb.innerHTML='';
   const rows = res.exemptions||[];
   if(!rows.length){
-    tb.innerHTML = '<tr><td colspan="9" class="muted">Không có trường hợp nào bị miễn trừ trong khoảng ngày này.</td></tr>';
+    tb.innerHTML = '<tr><td colspan="10" class="muted">Không có trường hợp nào bị miễn trừ trong khoảng ngày này.</td></tr>';
     return;
   }
   rows.forEach(e=>{
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${e.caseId||''}</td><td>${e.name}</td><td>${e.ngay||''}</td><td>${e.tenDV||''}</td><td>${e.loaiP||''}</td><td>${FIELD_LABELS[e.field]||e.field}</td><td>${e.maQD||''}</td><td>${e.chinh2||''}</td><td>${e.phu4||''}</td>`;
+    tr.innerHTML = `<td>${e.caseId||''}</td><td>${e.name}</td><td>${e.ngay||''}</td><td>${e.tenDV||''}</td><td>${e.loaiP||''}</td><td>${FIELD_LABELS[e.field]||e.field}</td><td>${e.reason||''}</td><td>${e.maQD||''}</td><td>${e.chinh2||''}</td><td>${e.phu4||''}</td>`;
     tb.appendChild(tr);
   });
 }
@@ -1793,10 +1803,10 @@ function exportExemptExcel(){
   const wsData = [
     ['SỞ Y TẾ TỈNH GIA LAI'],['BỆNH VIỆN ĐA KHOA TRUNG TÂM'],
     [`DANH SÁCH NHÂN VIÊN KHÔNG ĐƯỢC TÍNH TIỀN (THEO QUY TẮC MIỄN TRỪ) — Từ ${from} đến ${to}`],[],
-    ['Mã ca','Họ tên','Ngày BĐ','Tên dịch vụ','Loại PTTT','Cột không tính','Mã TT50','Gây mê Chính','Dụng cụ Vòng Trong']
+    ['Mã ca','Họ tên','Ngày BĐ','Tên dịch vụ','Loại PTTT','Cột không tính','Lý do','Mã TT50','Gây mê Chính','Dụng cụ Vòng Trong']
   ];
   rows.forEach(e=>{
-    wsData.push([e.caseId||'', e.name, e.ngay||'', e.tenDV||'', e.loaiP||'', FIELD_LABELS[e.field]||e.field, e.maQD||'', e.chinh2||'', e.phu4||'']);
+    wsData.push([e.caseId||'', e.name, e.ngay||'', e.tenDV||'', e.loaiP||'', FIELD_LABELS[e.field]||e.field, e.reason||'', e.maQD||'', e.chinh2||'', e.phu4||'']);
   });
   const ws = XLSX.utils.aoa_to_sheet(wsData);
   const wb = XLSX.utils.book_new();
@@ -1997,23 +2007,39 @@ function computeGT(){
 /* ============================================================
    EXPORT
    ============================================================ */
+function getExportViewRows(){
+  const mode = document.getElementById('groupViewMode') ? document.getElementById('groupViewMode').value : 'all'; // all|gm|dc
+  const pct = CONFIG.deductPct/100;
+  if(mode!=='gm' && mode!=='dc') return {mode:'all', rows: CURRENT_SUMMARY.list, label:null};
+  const rows = CURRENT_SUMMARY.list
+    .filter(r=> r[mode] > 0)
+    .map(r=> ({name:r.name, amount:r[mode], afterDeduct:r[mode]*(1-pct)}));
+  return {mode, rows, label: mode==='gm' ? 'Gây mê (GM)' : 'Dụng cụ (DC)'};
+}
+
 function exportExcel(){
   if(!CURRENT_SUMMARY){ toast('Hãy tính bảng tổng hợp trước.'); return; }
   const from = document.getElementById('sumFrom').value, to = document.getElementById('sumTo').value;
   const detail = document.getElementById('exportGroupMode').value==='detail';
-  const header = detail
-    ? ['STT','Họ tên','Tiền Gây mê (GM)','Tiền Dụng cụ (DC)','Tổng tiền (chưa trừ %)','Tổng tiền (đã trừ '+CONFIG.deductPct+'%)']
-    : ['STT','Họ tên','Tổng tiền (chưa trừ %)','Tổng tiền (đã trừ '+CONFIG.deductPct+'%)'];
+  const view = getExportViewRows();
+  let header, dataRows;
+  if(view.mode==='all'){
+    header = detail
+      ? ['STT','Họ tên','Tiền Gây mê (GM)','Tiền Dụng cụ (DC)','Tổng tiền (chưa trừ %)','Tổng tiền (đã trừ '+CONFIG.deductPct+'%)']
+      : ['STT','Họ tên','Tổng tiền (chưa trừ %)','Tổng tiền (đã trừ '+CONFIG.deductPct+'%)'];
+    dataRows = view.rows.map((r,i)=> detail ? [i+1, r.name, r.gm, r.dc, r.total, Math.round(r.afterDeduct)] : [i+1, r.name, r.total, Math.round(r.afterDeduct)]);
+  } else {
+    header = ['STT','Họ tên','Tiền '+view.label+' (chưa trừ %)','Tiền '+view.label+' (đã trừ '+CONFIG.deductPct+'%)'];
+    dataRows = view.rows.map((r,i)=>[i+1, r.name, r.amount, Math.round(r.afterDeduct)]);
+  }
   const wsData = [
     ['SỞ Y TẾ TỈNH GIA LAI'],
     ['BỆNH VIỆN ĐA KHOA TRUNG TÂM'],
-    [`BẢNG TỔNG HỢP BỒI DƯỠNG PHẪU THUẬT - THỦ THUẬT (Từ ${formatDateVN(from)} đến ${formatDateVN(to)})`],
+    [`BẢNG TỔNG HỢP BỒI DƯỠNG PHẪU THUẬT - THỦ THUẬT${view.mode==='all'?'':' — '+view.label} (Từ ${formatDateVN(from)} đến ${formatDateVN(to)})`],
     [],
     header
   ];
-  CURRENT_SUMMARY.list.forEach((r,i)=> wsData.push(
-    detail ? [i+1, r.name, r.gm, r.dc, r.total, Math.round(r.afterDeduct)] : [i+1, r.name, r.total, Math.round(r.afterDeduct)]
-  ));
+  dataRows.forEach(row=> wsData.push(row));
   wsData.push([]);
   wsData.push(['DANH SÁCH KHÔNG TÍNH TIỀN (NGOÀI DANH MỤC KHOA)']);
   wsData.push(['Mã ca','Ngày','Họ tên','Vai trò','Số tiền']);
@@ -2025,10 +2051,10 @@ function exportExcel(){
     wsData.push([tds[0].textContent, tds[1].textContent.replace(/\./g,'').replace(' đ','')]);
   });
   const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = detail ? [{wch:6},{wch:28},{wch:18},{wch:18},{wch:22},{wch:22}] : [{wch:6},{wch:28},{wch:22},{wch:22}];
+  ws['!cols'] = (view.mode==='all' && detail) ? [{wch:6},{wch:28},{wch:18},{wch:18},{wch:22},{wch:22}] : [{wch:6},{wch:28},{wch:22},{wch:22}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Tong hop');
-  XLSX.writeFile(wb, `BangBoiDuong_${from}_${to}.xlsx`);
+  XLSX.writeFile(wb, `BangBoiDuong_${from}_${to}${view.mode==='all'?'':'_'+view.mode.toUpperCase()}.xlsx`);
   toast('Đã xuất file Excel.');
 }
 
@@ -2243,17 +2269,26 @@ function exportWord(){
   if(!CURRENT_SUMMARY){ toast('Hãy tính bảng tổng hợp trước.'); return; }
   const from = document.getElementById('sumFrom').value, to = document.getElementById('sumTo').value;
   const detail = document.getElementById('exportGroupMode').value==='detail';
-  let rowsHtml = CURRENT_SUMMARY.list.map((r,i)=> detail
-    ? `<tr><td>${i+1}</td><td>${r.name}</td><td align="right">${fmtNum(r.gm)}</td><td align="right">${fmtNum(r.dc)}</td><td align="right">${fmtNum(r.total)}</td><td align="right">${fmtNum(r.afterDeduct)}</td></tr>`
-    : `<tr><td>${i+1}</td><td>${r.name}</td><td align="right">${fmtNum(r.total)}</td><td align="right">${fmtNum(r.afterDeduct)}</td></tr>`
-  ).join('');
+  const view = getExportViewRows();
+  let rowsHtml, headerRow;
+  if(view.mode==='all'){
+    rowsHtml = view.rows.map((r,i)=> detail
+      ? `<tr><td>${i+1}</td><td>${r.name}</td><td align="right">${fmtNum(r.gm)}</td><td align="right">${fmtNum(r.dc)}</td><td align="right">${fmtNum(r.total)}</td><td align="right">${fmtNum(r.afterDeduct)}</td></tr>`
+      : `<tr><td>${i+1}</td><td>${r.name}</td><td align="right">${fmtNum(r.total)}</td><td align="right">${fmtNum(r.afterDeduct)}</td></tr>`
+    ).join('');
+    headerRow = detail
+      ? `<tr><th>STT</th><th>Họ và tên</th><th>Tiền Gây mê (GM)</th><th>Tiền Dụng cụ (DC)</th><th>Tổng tiền (chưa trừ %)</th><th>Tổng tiền (đã trừ ${CONFIG.deductPct}%)</th></tr>`
+      : `<tr><th>STT</th><th>Họ và tên</th><th>Tổng tiền (chưa trừ %)</th><th>Tổng tiền (đã trừ ${CONFIG.deductPct}%)</th></tr>`;
+  } else {
+    rowsHtml = view.rows.map((r,i)=>
+      `<tr><td>${i+1}</td><td>${r.name}</td><td align="right">${fmtNum(r.amount)}</td><td align="right">${fmtNum(r.afterDeduct)}</td></tr>`
+    ).join('');
+    headerRow = `<tr><th>STT</th><th>Họ và tên</th><th>Tiền ${view.label} (chưa trừ %)</th><th>Tiền ${view.label} (đã trừ ${CONFIG.deductPct}%)</th></tr>`;
+  }
   let gtHtml = Array.from(document.querySelectorAll('#gtTable tbody tr')).map(tr=>{
     const tds = tr.querySelectorAll('td');
     return `<tr><td>${tds[0].textContent}</td><td align="right">${tds[1].textContent}</td><td>${tds[2].textContent}</td></tr>`;
   }).join('');
-  const headerRow = detail
-    ? `<tr><th>STT</th><th>Họ và tên</th><th>Tiền Gây mê (GM)</th><th>Tiền Dụng cụ (DC)</th><th>Tổng tiền (chưa trừ %)</th><th>Tổng tiền (đã trừ ${CONFIG.deductPct}%)</th></tr>`
-    : `<tr><th>STT</th><th>Họ và tên</th><th>Tổng tiền (chưa trừ %)</th><th>Tổng tiền (đã trừ ${CONFIG.deductPct}%)</th></tr>`;
   const html = `
   <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
   <head><meta charset="utf-8"><style>
@@ -2265,7 +2300,7 @@ function exportWord(){
   </style></head>
   <body>
     <p class="center"><b>SỞ Y TẾ TỈNH GIA LAI</b><br><b>BỆNH VIỆN ĐA KHOA TRUNG TÂM</b></p>
-    <p class="center"><b>BẢNG TỔNG HỢP BỒI DƯỠNG PHẪU THUẬT – THỦ THUẬT</b><br>Từ ngày ${formatDateVN(from)} đến ngày ${formatDateVN(to)}</p>
+    <p class="center"><b>BẢNG TỔNG HỢP BỒI DƯỠNG PHẪU THUẬT – THỦ THUẬT${view.mode==='all'?'':' — '+view.label}</b><br>Từ ngày ${formatDateVN(from)} đến ngày ${formatDateVN(to)}</p>
     <table>
       ${headerRow}
       ${rowsHtml}
@@ -2288,7 +2323,7 @@ function exportWord(){
   const blob = new Blob(['\ufeff', html], {type:'application/msword'});
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = `BangBoiDuong_${from}_${to}.doc`;
+  link.download = `BangBoiDuong_${from}_${to}${view.mode==='all'?'':'_'+view.mode.toUpperCase()}.doc`;
   link.click();
   toast('Đã xuất file Word.');
 }
