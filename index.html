@@ -482,9 +482,10 @@
     <details class="card">
       <summary>Danh sách nhân viên không được tính tiền (theo quy tắc miễn trừ)</summary>
       <div class="card-body">
-      <p class="muted">Các trường hợp trong khoảng ngày đã chọn bị loại khỏi tính tiền do khớp quy tắc miễn trừ Mã QĐ (xem/sửa quy tắc ở tab Danh mục &amp; đơn giá).</p>
+      <p class="muted">Các trường hợp trong khoảng ngày đã chọn bị loại khỏi tính tiền do khớp quy tắc miễn trừ Mã QĐ (xem/sửa quy tắc ở tab Danh mục &amp; đơn giá). Bảng đầy đủ các trường của ca mổ để đối chiếu với file gốc và file đã cắt tiền theo điều kiện.</p>
+      <div style="margin-bottom:8px;"><button class="btn secondary small" id="btnExportExemptExcel" type="button">⬇ Xuất Excel để đối chiếu</button></div>
       <div style="overflow:auto;"><table class="data" id="exemptionCasesTable">
-        <thead><tr><th>Mã ca</th><th>Ngày</th><th>Họ tên</th><th>Cột không tính</th><th>Mã QĐ</th><th>Loại</th></tr></thead>
+        <thead><tr><th>Mã ca</th><th>Họ tên</th><th>Ngày BĐ</th><th>Tên dịch vụ</th><th>Loại PTTT</th><th>Cột không tính</th><th>Mã TT50</th><th>Gây mê Chính</th><th>Dụng cụ Vòng Trong</th></tr></thead>
         <tbody></tbody>
       </table></div>
       </div>
@@ -1163,7 +1164,7 @@ function computeBatchExemptions(rows){
     excluded.forEach(fieldKey=>{
       const name = r[fieldKey];
       if(!name) return;
-      list.push({caseId:r.caseId, ngay:r.ngay, name:name.trim(), field:fieldKey, maQD:r.maQD, loaiP:r.loaiP});
+      list.push({caseId:r.caseId, ngay:r.ngay, name:name.trim(), field:fieldKey, maQD:r.maQD, loaiP:r.loaiP, tenDV:r.tenDV||'', chinh2:r.chinh2||'', phu4:r.phu4||''});
     });
   });
   return list;
@@ -1222,7 +1223,7 @@ function renderBatchList(){
   BATCH_INDEX.slice().sort((a,b)=> new Date(b.uploadedAt)-new Date(a.uploadedAt)).forEach(b=>{
     const wrap = document.createElement('div');
     const exempt = b.exemptCases||[];
-    const exemptRowsHtml = exempt.map(e=>`<tr><td>${e.caseId||''}</td><td>${e.ngay||''}</td><td>${e.name}</td><td>${FIELD_LABELS[e.field]||e.field}</td><td>${e.maQD||''}</td><td>${e.loaiP||''}</td></tr>`).join('');
+    const exemptRowsHtml = exempt.map(e=>`<tr><td>${e.caseId||''}</td><td>${e.name}</td><td>${e.ngay||''}</td><td>${e.tenDV||''}</td><td>${e.loaiP||''}</td><td>${FIELD_LABELS[e.field]||e.field}</td><td>${e.maQD||''}</td><td>${e.chinh2||''}</td><td>${e.phu4||''}</td></tr>`).join('');
     wrap.innerHTML = `<div class="b">
         <div><b>${b.filename}</b> <span class="pill">${b.from} → ${b.to}</span> <span class="muted">${b.count} ca ${b.note?(' · '+b.note):''}</span>
           ${exempt.length? `<span class="flag">${exempt.length} ca không tính tiền (miễn trừ)</span>`:''}
@@ -1232,7 +1233,7 @@ function renderBatchList(){
       ${exempt.length? `<details style="margin:-4px 0 8px 0;">
         <summary class="muted" style="cursor:pointer;">Xem danh sách ${exempt.length} trường hợp không tính tiền của đợt này</summary>
         <div style="overflow:auto;"><table class="data" style="margin-top:6px;">
-          <thead><tr><th>Mã ca</th><th>Ngày</th><th>Họ tên</th><th>Cột không tính</th><th>Mã QĐ</th><th>Loại</th></tr></thead>
+          <thead><tr><th>Mã ca</th><th>Họ tên</th><th>Ngày BĐ</th><th>Tên dịch vụ</th><th>Loại PTTT</th><th>Cột không tính</th><th>Mã TT50</th><th>Gây mê Chính</th><th>Dụng cụ Vòng Trong</th></tr></thead>
           <tbody>${exemptRowsHtml}</tbody>
         </table></div>
       </details>`:''}`;
@@ -1564,7 +1565,7 @@ function computeEarningsFromBatches(batches, from, to){
         const name = rawName.trim();
         if(!name) return;
         if(excluded.has(fieldKey)){
-          exemptions.push({caseId:r.caseId, ngay:r.ngay, name, field:fieldKey, maQD:r.maQD, loaiP:r.loaiP});
+          exemptions.push({caseId:r.caseId, ngay:r.ngay, name, field:fieldKey, maQD:r.maQD, loaiP:r.loaiP, tenDV:r.tenDV||'', chinh2:r.chinh2||'', phu4:r.phu4||''});
           return;
         }
         if(!rosterNames.has(name.toLowerCase())){
@@ -1626,6 +1627,7 @@ function setupSummaryHandlers(){
   document.getElementById('btnExportWord2').addEventListener('click', exportWord);
   document.getElementById('exportGroupMode').addEventListener('change', e=>{ document.getElementById('exportGroupMode2').value = e.target.value; });
   document.getElementById('exportGroupMode2').addEventListener('change', e=>{ document.getElementById('exportGroupMode').value = e.target.value; });
+  document.getElementById('btnExportExemptExcel').addEventListener('click', exportExemptExcel);
   document.getElementById('btnExportZaloExcel').addEventListener('click', exportZaloExcel);
   document.getElementById('btnExportZaloWord').addEventListener('click', exportZaloWord);
   document.getElementById('zaloTimeMode').addEventListener('change', toggleZaloTimeInputs);
@@ -1675,14 +1677,33 @@ function renderExemptionCasesTable(res){
   tb.innerHTML='';
   const rows = res.exemptions||[];
   if(!rows.length){
-    tb.innerHTML = '<tr><td colspan="6" class="muted">Không có trường hợp nào bị miễn trừ trong khoảng ngày này.</td></tr>';
+    tb.innerHTML = '<tr><td colspan="9" class="muted">Không có trường hợp nào bị miễn trừ trong khoảng ngày này.</td></tr>';
     return;
   }
   rows.forEach(e=>{
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${e.caseId||''}</td><td>${e.ngay||''}</td><td>${e.name}</td><td>${FIELD_LABELS[e.field]||e.field}</td><td>${e.maQD||''}</td><td>${e.loaiP||''}</td>`;
+    tr.innerHTML = `<td>${e.caseId||''}</td><td>${e.name}</td><td>${e.ngay||''}</td><td>${e.tenDV||''}</td><td>${e.loaiP||''}</td><td>${FIELD_LABELS[e.field]||e.field}</td><td>${e.maQD||''}</td><td>${e.chinh2||''}</td><td>${e.phu4||''}</td>`;
     tb.appendChild(tr);
   });
+}
+
+function exportExemptExcel(){
+  const rows = (CURRENT_SUMMARY && CURRENT_SUMMARY.exemptions) || [];
+  if(!rows.length){ toast('Chưa có dữ liệu miễn trừ để xuất — hãy tính bảng tổng hợp trước.'); return; }
+  const from = document.getElementById('sumFrom').value, to = document.getElementById('sumTo').value;
+  const wsData = [
+    ['SỞ Y TẾ TỈNH GIA LAI'],['BỆNH VIỆN ĐA KHOA TRUNG TÂM'],
+    [`DANH SÁCH NHÂN VIÊN KHÔNG ĐƯỢC TÍNH TIỀN (THEO QUY TẮC MIỄN TRỪ) — Từ ${from} đến ${to}`],[],
+    ['Mã ca','Họ tên','Ngày BĐ','Tên dịch vụ','Loại PTTT','Cột không tính','Mã TT50','Gây mê Chính','Dụng cụ Vòng Trong']
+  ];
+  rows.forEach(e=>{
+    wsData.push([e.caseId||'', e.name, e.ngay||'', e.tenDV||'', e.loaiP||'', FIELD_LABELS[e.field]||e.field, e.maQD||'', e.chinh2||'', e.phu4||'']);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Danh sach mien tru');
+  XLSX.writeFile(wb, `DanhSachMienTru_${from}_${to}.xlsx`);
+  toast('Đã xuất file Excel — đối chiếu với bảng gốc và bảng đã cắt tiền.');
 }
 
 function renderKpis(res){
@@ -2095,10 +2116,11 @@ async function exportZaloWord(){
   const html = `
   <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
   <head><meta charset="utf-8"><style>
+    @page{ size: 29.7cm 21cm; margin: 1cm 1cm 1cm 1cm; }
     body{font-family:"Times New Roman", serif; font-size:11pt;}
     table{border-collapse:collapse;}
-    td, th{border:0.5pt solid #444; padding:2px 7px; white-space:nowrap;}
-    td.gap, th.gap{border:none; width:26pt;}
+    td, th{border:0.5pt solid #444; padding:2px 6px; white-space:nowrap;}
+    td.gap, th.gap{border:none; width:16pt;}
     th{font-weight:bold;}
     .center{text-align:center;}
   </style></head>
