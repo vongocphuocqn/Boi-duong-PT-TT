@@ -135,9 +135,10 @@
   .staffgroup table th:nth-child(5), .staffgroup table td:nth-child(5){width:6%;}
   .staffgroup table th:nth-child(6), .staffgroup table td:nth-child(6){width:8%;}
   .staffgroup table th:nth-child(7), .staffgroup table td:nth-child(7){width:8%;}
-  .staffgroup table th:nth-child(8), .staffgroup table td:nth-child(8){width:17%;}
-  .staffgroup table th:nth-child(9), .staffgroup table td:nth-child(9){width:8%;}
-  .staffgroup table th:nth-child(10), .staffgroup table td:nth-child(10){width:6%;}
+  .staffgroup table th:nth-child(8), .staffgroup table td:nth-child(8){width:12%;}
+  .staffgroup table th:nth-child(9), .staffgroup table td:nth-child(9){width:7%;}
+  .staffgroup table th:nth-child(10), .staffgroup table td:nth-child(10){width:8%;}
+  .staffgroup table th:nth-child(11), .staffgroup table td:nth-child(11){width:5%;}
   .staffgroup table select.sel-gtmode{font-size:12px; padding:4px 3px;}
   .staffgroup table input.edit-name{font-size:13.5px;}
   #headerRowPreview table td{white-space:nowrap; max-width:160px; overflow:hidden; text-overflow:ellipsis;}
@@ -200,6 +201,7 @@
     <button data-tab="config" id="navConfigBtn">2. Danh mục &amp; đơn giá</button>
     <button data-tab="summary">3. Bảng tổng hợp</button>
     <button data-tab="stats">4. Thống kê</button>
+    <button data-tab="income" id="navIncomeBtn">5. Thu nhập thực tế</button>
   </nav>
 
   <!-- ===================== TAB 1: IMPORT ===================== -->
@@ -607,6 +609,133 @@
     </details>
   </section>
 
+  <!-- ===================== TAB 5: THU NHẬP THỰC TẾ (ADMIN) ===================== -->
+  <section class="tab" id="tab-income">
+    <details class="card" open>
+      <summary>Tải file bảng thanh toán tiền (Tài vụ chuyển khoản) — hằng tháng</summary>
+      <div class="card-body">
+      <p class="muted">Tải file Excel bảng thanh toán tiền phẫu thuật/thủ thuật do Tài vụ xuất (dạng: STT, Họ và tên, Số tài khoản, Số tiền, Ghi chú). Ứng dụng tự đối chiếu tên với <b>Danh mục nhân viên Khoa</b> (tab 2) — chỉ những người có trong danh mục mới được lưu vào thống kê. Với người thuộc nhóm <b>Gây mê</b> hoặc <b>Dụng cụ</b>, cột "Thực nhận" sẽ tự trừ tỷ lệ khấu trừ chung (hiện <span id="incomeDeductPctLabel">6</span>%); nhóm <b>Khác</b> giữ nguyên, không trừ.</p>
+      <div class="drop" id="incomeDropZone">
+        <div>📄 Kéo–thả file Excel vào đây, hoặc bấm để chọn file</div>
+        <div class="muted" style="margin-top:6px;">(có thể chọn nhiều file cùng lúc — mỗi file 1 tháng, xử lý lần lượt từng file)</div>
+        <input type="file" id="incomeFileInput" accept=".xlsx,.xls,.csv" multiple style="display:none;">
+      </div>
+      </div>
+    </details>
+
+    <details class="card" id="incomePreviewCard" style="display:none;" open>
+      <summary>Xem trước &amp; xác nhận trước khi lưu — <span id="incomeFileNameLabel"></span> <span id="incomeQueueLabel" class="muted" style="font-weight:normal; font-size:12.5px;"></span></summary>
+      <div class="card-body">
+        <div class="row">
+          <div class="col" style="max-width:200px;">
+            <label>Tháng của đợt này</label>
+            <input type="month" id="incomeMonthInput">
+          </div>
+          <div class="col" style="max-width:280px;">
+            <label>Ghi chú (tuỳ chọn)</label>
+            <input type="text" id="incomeNote" placeholder="VD: Bảng lương PT-TT tháng 2/2026">
+          </div>
+        </div>
+        <div class="kpis" id="incomePreviewKpi" style="margin-top:10px;"></div>
+
+        <details open style="margin-top:6px; border:1px solid var(--line); border-radius:6px; background:#fff;">
+          <summary style="cursor:pointer; padding:8px 12px; font-weight:bold; color:var(--navy2); list-style:none;">Danh sách chi tiết (bấm để ẩn/hiện)</summary>
+          <div style="padding:0 12px 12px 12px;">
+            <div class="toolbar" style="margin-bottom:8px;">
+              <div class="col" style="max-width:240px;">
+                <label>Lọc theo nhóm</label>
+                <select id="incomePreviewFilter">
+                  <option value="all">Tất cả</option>
+                  <option value="gm">Gây mê</option>
+                  <option value="dc">Dụng cụ</option>
+                  <option value="khac">Khác</option>
+                  <option value="unmatched">Không thuộc danh mục (bỏ qua)</option>
+                </select>
+              </div>
+              <div class="col" style="flex:0; align-self:end; display:flex; gap:8px;">
+                <button class="btn secondary small" id="btnExportIncomePreviewExcel" type="button">⬇ Xuất Excel</button>
+                <button class="btn secondary small" id="btnExportIncomePreviewWord" type="button">⬇ Xuất Word</button>
+              </div>
+            </div>
+            <div style="overflow:auto;"><table class="data" id="incomePreviewTable"></table></div>
+          </div>
+        </details>
+
+        <div style="margin-top:14px; display:flex; gap:10px;">
+          <button class="btn" id="btnSaveIncomeBatch">✔ Lưu đợt thu nhập này</button>
+          <button class="btn secondary" id="btnCancelIncome">Hủy</button>
+        </div>
+      </div>
+    </details>
+
+    <details class="card" open>
+      <summary>Các đợt thu nhập thực tế đã lưu</summary>
+      <div class="card-body">
+        <div class="batchlist" id="incomeBatchList"><p class="muted">Chưa có đợt thu nhập nào.</p></div>
+      </div>
+    </details>
+
+    <details class="card" open>
+      <summary>Thống kê thu nhập thực tế</summary>
+      <div class="card-body">
+      <div class="toolbar">
+        <div class="col" style="max-width:180px;"><label>Từ tháng</label><input type="month" id="incomeStatsFrom"></div>
+        <div class="col" style="max-width:180px;"><label>Đến tháng</label><input type="month" id="incomeStatsTo"></div>
+        <div class="col" style="flex:0;"><button class="btn" id="btnIncomeStatsCompute">⟳ Tính thống kê</button></div>
+        <div class="col" style="flex:0;"><button class="btn secondary" id="btnIncomeStatsExport" type="button">⬇ Xuất Excel</button></div>
+      </div>
+      <div class="kpis" id="incomeStatsKpi"></div>
+      </div>
+    </details>
+
+    <details class="card" open>
+      <summary>Tổng hợp theo nhóm</summary>
+      <div class="card-body">
+        <div style="overflow:auto;"><table class="data" id="incomeGroupTable"></table></div>
+      </div>
+    </details>
+
+    <details class="card" open>
+      <summary>Top nhân viên theo Thực nhận</summary>
+      <div class="card-body">
+        <div class="row" style="align-items:center; margin-bottom:8px;">
+          <div class="col" style="max-width:200px;">
+            <label>Hiện</label>
+            <select id="incomeTopCount">
+              <option value="10">Top 10</option>
+              <option value="20">Top 20</option>
+              <option value="all">Tất cả nhân viên</option>
+            </select>
+          </div>
+        </div>
+        <div id="incomeTopChart"></div>
+      </div>
+    </details>
+
+    <details class="card" open>
+      <summary>Tổng thực nhận toàn khoa theo tháng</summary>
+      <div class="card-body"><div id="incomeMonthChart"></div></div>
+    </details>
+
+    <details class="card" open>
+      <summary>Chi tiết theo từng nhân viên</summary>
+      <div class="card-body">
+        <div class="row" style="align-items:center; margin-bottom:8px;">
+          <div class="col" style="max-width:260px;">
+            <label>Xem theo (áp dụng cả khi xuất Excel)</label>
+            <select id="incomeStaffViewMode">
+              <option value="all">Tất cả (Gây mê + Dụng cụ + Khác)</option>
+              <option value="gm">Chỉ Gây mê</option>
+              <option value="dc">Chỉ Dụng cụ</option>
+              <option value="khac">Chỉ Khác</option>
+            </select>
+          </div>
+        </div>
+        <div style="overflow:auto;"><table class="data" id="incomeStaffTable"></table></div>
+      </div>
+    </details>
+  </section>
+
 </div>
 
 <div class="toast" id="toast"></div>
@@ -764,7 +893,7 @@ const ICU_NURSES_RAW = [
 ];
 function buildDefaultStaff(){
   return DEFAULT_STAFF_RAW.map(([name,donNguyen,chucVu])=>(
-    {name, donNguyen, chucVu, coc1:false, hcpm:false, giantiep:false, gtHeso:1, gtMode:'heso'}
+    {name, donNguyen, chucVu, coc1:false, hcpm:false, giantiep:false, gtHeso:1, gtMode:'heso', nhomThuNhap: donNguyen==='Phòng Mổ' ? 'gm' : 'khac'}
   ));
 }
 
@@ -782,18 +911,113 @@ let CONFIG = {
   savedMappings: {}, // key: profile (vd 'da_hoan_thanh' / 'chua_hoan_thanh' / 'mac_dinh') -> mapping object
   seedVersion: 0,
 };
-let BATCH_INDEX = []; // [{id, from, to, note, uploadedAt, filename, count}]
+let BATCH_INDEX = []; // [{id, from, to, note, uploadedAt, filename, count}] — gộp User + Admin để dùng chung cho các hàm thống kê
+let BATCH_INDEX_BY_ROLE = {user:[], admin:[]}; // kho riêng độc lập theo vai trò, KHÔNG ghi đè lẫn nhau khi lưu
+
+// Ghi lại kho batch của 1 vai trò xuống storage, rồi cập nhật BATCH_INDEX gộp cho các hàm đọc dùng chung.
+// Luôn chỉ ghi đúng key của vai trò đó -> User và Admin không bao giờ đè mất dữ liệu của nhau.
+async function persistBatchIndex(role){
+  await sSet('batches:index:'+role, BATCH_INDEX_BY_ROLE[role]);
+  BATCH_INDEX = BATCH_INDEX_BY_ROLE.user.concat(BATCH_INDEX_BY_ROLE.admin);
+}
 let PENDING = null; // {rows, headers, filename}
 let CURRENT_SUMMARY = null;
 
 /* ============================================================
    STORAGE HELPERS
+   - Ưu tiên 1: kho lưu trữ của Claude (window.storage) khi chạy trong môi trường Claude — không giới hạn dung lượng thực tế.
+   - Ưu tiên 2: IndexedDB của trình duyệt — dung lượng lớn hơn localStorage RẤT NHIỀU (thường hàng trăm MB→nhiều GB tuỳ ổ đĩa còn trống),
+     phù hợp khi tự host file này hoặc mở trực tiếp lâu dài, tránh lỗi "hết dung lượng" (QuotaExceededError) của localStorage (chỉ ~5-10MB).
+   - Ưu tiên 3 (dự phòng cuối, trình duyệt rất cũ không có IndexedDB): localStorage.
+   - Dữ liệu cũ đã lỡ lưu trong localStorage (từ các bản trước) sẽ được TỰ ĐỘNG chuyển sang IndexedDB ở lần mở đầu tiên — không mất dữ liệu.
    ============================================================ */
 const HAS_ARTIFACT_STORAGE = (typeof window.storage !== 'undefined') && !!window.storage
   && typeof window.storage.get === 'function' && typeof window.storage.set === 'function';
+const HAS_IDB = (typeof indexedDB !== 'undefined');
 const LS_PREFIX = 'boiduong_pttt:';
+const IDB_NAME = 'boiduong_pttt_db';
+const IDB_STORE = 'kv';
 
 let LAST_STORAGE_ERROR = null;
+let idbConnPromise = null;
+
+function openIDB(){
+  if(idbConnPromise) return idbConnPromise;
+  idbConnPromise = new Promise((resolve)=>{
+    if(!HAS_IDB){ resolve(null); return; }
+    try{
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = ()=>{ req.result.createObjectStore(IDB_STORE); };
+      req.onsuccess = ()=> resolve(req.result);
+      req.onerror = ()=> resolve(null);
+      req.onblocked = ()=> resolve(null);
+    }catch(e){ resolve(null); }
+  });
+  return idbConnPromise;
+}
+async function idbGet(key){
+  const db = await openIDB();
+  if(!db) throw new Error('IndexedDB không khả dụng');
+  return new Promise((resolve,reject)=>{
+    const req = db.transaction(IDB_STORE,'readonly').objectStore(IDB_STORE).get(key);
+    req.onsuccess = ()=> resolve(req.result===undefined ? null : req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbSet(key,val){
+  const db = await openIDB();
+  if(!db) throw new Error('IndexedDB không khả dụng');
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).put(val, key);
+    tx.oncomplete = ()=> resolve(true);
+    tx.onerror = ()=> reject(tx.error);
+    tx.onabort = ()=> reject(tx.error);
+  });
+}
+async function idbDelete(key){
+  const db = await openIDB();
+  if(!db) return;
+  return new Promise((resolve)=>{
+    const tx = db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).delete(key);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> resolve();
+  });
+}
+async function idbListKeys(){
+  const db = await openIDB();
+  if(!db) return [];
+  return new Promise((resolve)=>{
+    const req = db.transaction(IDB_STORE,'readonly').objectStore(IDB_STORE).getAllKeys();
+    req.onsuccess = ()=> resolve(req.result||[]);
+    req.onerror = ()=> resolve([]);
+  });
+}
+
+// Chạy 1 lần khi mở app: nếu IndexedDB đang trống nhưng localStorage còn dữ liệu cũ (bản trước),
+// tự động chuyển toàn bộ sang IndexedDB để không bị giới hạn dung lượng nhỏ của localStorage nữa.
+async function migrateLocalStorageToIDB(){
+  if(HAS_ARTIFACT_STORAGE || !HAS_IDB) return;
+  try{
+    const existingKeys = await idbListKeys();
+    if(existingKeys.length) return; // đã có dữ liệu trong IndexedDB rồi -> không di chuyển lại
+    let migratedCount = 0;
+    for(let i=0;i<localStorage.length;i++){
+      const fullKey = localStorage.key(i);
+      if(!fullKey || !fullKey.startsWith(LS_PREFIX)) continue;
+      try{
+        const raw = localStorage.getItem(fullKey);
+        const val = JSON.parse(raw);
+        await idbSet(fullKey.slice(LS_PREFIX.length), val);
+        migratedCount++;
+      }catch(e){ /* bỏ qua mục lỗi, không chặn toàn bộ quá trình chuyển đổi */ }
+    }
+    if(migratedCount>0){
+      console.log(`Đã tự động chuyển ${migratedCount} mục dữ liệu từ localStorage sang IndexedDB.`);
+    }
+  }catch(e){ console.error('Di chuyển dữ liệu sang IndexedDB thất bại:', e); }
+}
 
 async function testStorageAndWarn(){
   const testKey = '__storage_test__';
@@ -815,19 +1039,28 @@ async function sGet(key){
     if(HAS_ARTIFACT_STORAGE){
       const r = await window.storage.get(key,true);
       return r ? JSON.parse(r.value) : null;
-    } else {
-      const raw = localStorage.getItem(LS_PREFIX+key);
-      return raw ? JSON.parse(raw) : null;
     }
+    if(HAS_IDB){
+      try{
+        const val = await idbGet(key);
+        if(val!==null && val!==undefined) return val;
+      }catch(e){ /* IndexedDB lỗi -> thử localStorage bên dưới */ }
+    }
+    const raw = localStorage.getItem(LS_PREFIX+key);
+    return raw ? JSON.parse(raw) : null;
   } catch(e){ LAST_STORAGE_ERROR = (e && e.name ? e.name+': ' : '')+(e && e.message ? e.message : String(e)); return null; }
 }
 async function sSet(key,val){
   try{
     if(HAS_ARTIFACT_STORAGE){
       await window.storage.set(key, JSON.stringify(val), true);
-    } else {
-      localStorage.setItem(LS_PREFIX+key, JSON.stringify(val));
+      return true;
     }
+    if(HAS_IDB){
+      await idbSet(key, val);
+      return true;
+    }
+    localStorage.setItem(LS_PREFIX+key, JSON.stringify(val));
     return true;
   } catch(e){
     LAST_STORAGE_ERROR = (e && e.name ? e.name+': ' : '')+(e && e.message ? e.message : String(e));
@@ -837,15 +1070,30 @@ async function sSet(key,val){
 }
 async function sDelete(key){
   try{
-    if(HAS_ARTIFACT_STORAGE) await window.storage.delete(key,true);
-    else localStorage.removeItem(LS_PREFIX+key);
+    if(HAS_ARTIFACT_STORAGE){ await window.storage.delete(key,true); return; }
+    if(HAS_IDB){ await idbDelete(key); return; }
+    localStorage.removeItem(LS_PREFIX+key);
   } catch(e){}
 }
 
-function toast(msg){
+function toast(msg, durationMs){
   const t=document.getElementById('toast');
   t.textContent=msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),3800);
+  setTimeout(()=>t.classList.remove('show'), durationMs||3800);
+}
+// Thông báo lỗi lưu trữ dễ hiểu — kèm gợi ý khắc phục khi hết dung lượng (QuotaExceededError).
+// Từ khi nâng cấp sang IndexedDB, dung lượng đã lớn hơn localStorage rất nhiều nên lỗi này
+// chủ yếu xảy ra khi: (1) mở file trực tiếp kiểu file:// và trình duyệt chặn hẳn lưu trữ, hoặc
+// (2) ổ đĩa máy tính thật sự sắp hết dung lượng trống.
+function storageErrorMessage(){
+  const err = LAST_STORAGE_ERROR||'';
+  if(/quota/i.test(err)){
+    if(HAS_IDB && !HAS_ARTIFACT_STORAGE){
+      return 'Lỗi lưu trữ: Hết dung lượng lưu trữ (đã dùng IndexedDB, dung lượng lớn) — có thể do ổ đĩa máy tính sắp hết chỗ trống, hoặc trình duyệt chặn lưu trữ khi mở file trực tiếp kiểu file://. Cách khắc phục: kiểm tra dung lượng ổ đĩa còn trống, hoặc mở file qua một trang web thật (GitHub Pages/http/https) thay vì mở trực tiếp trong Downloads. Anh cũng có thể xuất Excel rồi xoá bớt vài đợt dữ liệu cũ không cần thiết để giải phóng chỗ trống.';
+    }
+    return 'Lỗi lưu trữ: Hết dung lượng lưu trữ của trình duyệt — thường do đang mở file trực tiếp kiểu file:// nên trình duyệt chặn/giới hạn lưu trữ. Cách khắc phục: đưa file HTML này lên một trang web thật (GitHub Pages hoặc máy chủ http/https bất kỳ) rồi mở qua đường link đó, thay vì mở trực tiếp file trong Downloads. Có thể cần xoá bớt vài đợt dữ liệu cũ không cần thiết để có chỗ trống tạm thời.';
+  }
+  return 'Lỗi lưu trữ: '+(err||'không rõ nguyên nhân')+'. Thử lại.';
 }
 function fmt(n){
   n = Math.round(n||0);
@@ -858,24 +1106,54 @@ function fmtNum(n){ return Math.round(n||0).toLocaleString('vi-VN'); }
    ============================================================ */
 async function init(){
   document.getElementById('clockInfo').textContent = new Date().toLocaleDateString('vi-VN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  await migrateLocalStorageToIDB();
   document.getElementById('storageInfo').textContent = HAS_ARTIFACT_STORAGE
-    ? '☁ Dữ liệu dùng chung Admin/User, lưu trong Claude'
-    : '💾 Dữ liệu lưu trên trình duyệt này (không tự đồng bộ sang máy/trình duyệt khác)';
+    ? '☁ Đợt nhập của User và Admin lưu độc lập (không đè lẫn nhau); riêng Cấu hình/Đơn giá dùng chung do Admin quản lý — lưu trong Claude'
+    : (HAS_IDB
+        ? '💾 Dữ liệu lưu trên trình duyệt này bằng IndexedDB (dung lượng lớn, không tự đồng bộ sang máy/trình duyệt khác)'
+        : '💾 Dữ liệu lưu trên trình duyệt này (không tự đồng bộ sang máy/trình duyệt khác)');
   await testStorageAndWarn();
   const cfg = await sGet('config:main');
   if(cfg) CONFIG = Object.assign(CONFIG, cfg);
   migrateStaffConfig();
   await sSet('config:main', CONFIG);
-  const idx = await sGet('batches:index');
-  if(idx) BATCH_INDEX = idx;
+  const idxUser = await sGet('batches:index:user');
+  const idxAdmin = await sGet('batches:index:admin');
+  if(idxUser || idxAdmin){
+    BATCH_INDEX_BY_ROLE.user = idxUser || [];
+    BATCH_INDEX_BY_ROLE.admin = idxAdmin || [];
+  } else {
+    // Chưa từng tách kho -> nếu còn dữ liệu cũ dùng chung 1 danh sách, tự động chia lại theo enteredBy
+    const legacyIdx = await sGet('batches:index');
+    if(legacyIdx && legacyIdx.length){
+      legacyIdx.forEach(b=>{
+        const role = b.enteredBy==='admin' ? 'admin' : 'user';
+        BATCH_INDEX_BY_ROLE[role].push(b);
+      });
+      await sSet('batches:index:user', BATCH_INDEX_BY_ROLE.user);
+      await sSet('batches:index:admin', BATCH_INDEX_BY_ROLE.admin);
+    }
+  }
+  BATCH_INDEX = BATCH_INDEX_BY_ROLE.user.concat(BATCH_INDEX_BY_ROLE.admin);
+  const incIdx = await sGet('income:index');
+  if(incIdx) INCOME_INDEX = incIdx;
   renderRateTable();
   renderExemptTable();
   renderStaffMasterTable();
   renderBatchList();
+  renderIncomeBatchList();
   setupTabs();
   setupImport();
   setupConfigHandlers();
   setupSummaryHandlers();
+  setupIncomeUpload();
+  {
+    const now = new Date();
+    const curMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    document.getElementById('incomeStatsFrom').value = curMonth;
+    document.getElementById('incomeStatsTo').value = curMonth;
+    document.getElementById('incomeDeductPctLabel').textContent = CONFIG.deductPct;
+  }
   document.getElementById('monthlyStaffSelect').addEventListener('change', renderMonthlyChart);
   document.getElementById('monthlyFrom').addEventListener('change', renderMonthlyStats);
   document.getElementById('monthlyTo').addEventListener('change', renderMonthlyStats);
@@ -898,6 +1176,13 @@ async function init(){
    - Đây là khoá thao tác mềm phía trình duyệt (ẩn/khoá menu cấu hình),
      KHÔNG phải cơ chế bảo mật dữ liệu. Đổi mật khẩu Admin bằng cách
      sửa hằng số ADMIN_PASSWORD bên dưới.
+   - Kho "đợt dữ liệu" (batches) của User và Admin được lưu ĐỘC LẬP
+     (batches:index:user / batches:index:admin) để hai vai trò nhập
+     dữ liệu ở các thời điểm khác nhau KHÔNG ghi đè mất dữ liệu của nhau.
+     Khi thống kê/báo cáo, hệ thống vẫn gộp cả hai kho lại (BATCH_INDEX)
+     để tính đúng tổng thu toàn khoa.
+   - Riêng Cấu hình (đơn giá, danh mục nhân viên...) vẫn dùng CHUNG 1 kho
+     (config:main) và chỉ Admin có quyền chỉnh sửa, như trước giờ.
    ============================================================ */
 const ADMIN_PASSWORD = 'gmhs2026';
 const ROLE_KEY = 'boiduong_pttt_role';
@@ -911,9 +1196,11 @@ function applyRolePermissions(){
   badge.style.borderColor = isAdmin ? 'var(--good)' : 'var(--line)';
   const navConfigBtn = document.getElementById('navConfigBtn');
   navConfigBtn.style.display = isAdmin ? '' : 'none';
+  const navIncomeBtn = document.getElementById('navIncomeBtn');
+  navIncomeBtn.style.display = isAdmin ? '' : 'none';
   if(!isAdmin){
     const activeTab = document.querySelector('nav.tabs button.active');
-    if(activeTab && activeTab.dataset.tab==='config'){
+    if(activeTab && (activeTab.dataset.tab==='config' || activeTab.dataset.tab==='income')){
       document.querySelector('nav.tabs button[data-tab="import"]').click();
     }
   }
@@ -989,6 +1276,14 @@ function migrateStaffConfig(){
     delete CONFIG.giantiep;
   }
   CONFIG.staffMaster.forEach(s=>{ if(s.gtMode===undefined) s.gtMode='heso'; if(s.gtHeso===undefined) s.gtHeso=1; });
+  // Mặc định "Nhóm thu nhập" (áp dụng khấu trừ % khi tính Thu nhập thực tế) — Gây mê / Dụng cụ / Khác; có thể sửa tay từng người
+  CONFIG.staffMaster.forEach(s=>{
+    if(s.nhomThuNhap===undefined){
+      if(s.nhomGMDC !== undefined) s.nhomThuNhap = s.nhomGMDC ? 'gm' : 'khac'; // di chuyển từ cờ 2 nhóm cũ (bản trước)
+      else s.nhomThuNhap = (s.donNguyen==='Phòng Mổ') ? 'gm' : 'khac';
+    }
+    delete s.nhomGMDC;
+  });
 
   // one-time fix: cột "sát Gây mê" cho quy tắc Mã QĐ 12 thực chất là Dụng cụ (phu4), không phải Gây mê Phụ (phu3)
   if(!(CONFIG.ruleVersion>=2)){
@@ -1236,21 +1531,48 @@ function rebuildMapGrid(){
   grid.querySelector('select[data-field="ngay"]').addEventListener('change', autoFillDateRange);
 }
 
-// Tự động lấy Từ ngày/Đến ngày của đợt theo dữ liệu thật trong file (cột đã ánh xạ "Ngày phẫu thuật")
+// Tự động lấy Từ ngày/Đến ngày của đợt theo dữ liệu thật trong file (cột đã ánh xạ "Ngày phẫu thuật").
+// Nếu file không có cột ngày riêng từng dòng (VD: bảng tổng hợp chỉ có STT/Họ tên/Số tiền),
+// tự đọc tiêu đề kiểu "Tháng 02/2026" ở các dòng đầu file để suy ra khoảng Từ ngày–Đến ngày, khỏi phải nhập tay.
+function detectMonthTitleRange(allRows){
+  for(const row of allRows){
+    for(const cell of row){
+      if(cell===null || cell===undefined || cell==='') continue;
+      const s = String(cell);
+      const m = s.match(/th[aá]ng\s*(\d{1,2})[\/\-\s](\d{4})/i);
+      if(m){
+        const month = parseInt(m[1]), year = parseInt(m[2]);
+        if(month>=1 && month<=12){
+          return {from: new Date(year, month-1, 1), to: new Date(year, month, 0)};
+        }
+      }
+    }
+  }
+  return null;
+}
+
 function autoFillDateRange(){
   const sel = document.querySelector('#mapGrid select[data-field="ngay"]');
-  if(!sel || sel.value==='') return;
-  const colIdx = parseInt(sel.value);
   let min=null, max=null;
-  PENDING.rows.forEach(r=>{
-    const d = parseVNDate(r[colIdx]);
-    if(!d || isNaN(d)) return;
-    if(!min || d<min) min=d;
-    if(!max || d>max) max=d;
-  });
+  if(sel && sel.value!==''){
+    const colIdx = parseInt(sel.value);
+    PENDING.rows.forEach(r=>{
+      const d = parseVNDate(r[colIdx]);
+      if(!d || isNaN(d)) return;
+      if(!min || d<min) min=d;
+      if(!max || d>max) max=d;
+    });
+  }
   if(min && max){
     document.getElementById('batchFrom').value = fmtDateInput(min);
     document.getElementById('batchTo').value = fmtDateInput(max);
+    return;
+  }
+  // Không có cột ngày theo từng dòng (hoặc chưa ánh xạ) -> thử đọc tiêu đề "Tháng X/YYYY" ở đầu file
+  const monthRange = detectMonthTitleRange(PENDING.allRows);
+  if(monthRange){
+    document.getElementById('batchFrom').value = fmtDateInput(monthRange.from);
+    document.getElementById('batchTo').value = fmtDateInput(monthRange.to);
   }
 }
 
@@ -1307,9 +1629,9 @@ async function saveBatchFromMapping(){
     uploadedAt:new Date().toISOString(), rows, exemptCases, enteredBy:CURRENT_ROLE
   };
   const ok = await sSet('batch:'+id, batch);
-  if(!ok){ toast('Lỗi lưu trữ: '+(LAST_STORAGE_ERROR||'không rõ nguyên nhân')+'. Thử lại.'); return; }
-  BATCH_INDEX.push({id, from, to, note:batch.note, uploadedAt:batch.uploadedAt, filename:batch.filename, count:rows.length, exemptCases, enteredBy:batch.enteredBy});
-  await sSet('batches:index', BATCH_INDEX);
+  if(!ok){ toast(storageErrorMessage(), 10000); return; }
+  BATCH_INDEX_BY_ROLE[CURRENT_ROLE].push({id, from, to, note:batch.note, uploadedAt:batch.uploadedAt, filename:batch.filename, count:rows.length, exemptCases, enteredBy:batch.enteredBy});
+  await persistBatchIndex(CURRENT_ROLE);
   toast(`Đã lưu đợt "${batch.filename}" — ${rows.length} ca${exemptCases.length? `, ${exemptCases.length} trường hợp không tính tiền theo quy tắc miễn trừ`:''}.`);
   renderBatchList();
   document.getElementById('mappingCard').style.display='none';
@@ -1351,8 +1673,9 @@ function renderBatchList(){
     wrap.querySelector('button[data-id]').addEventListener('click', async ()=>{
       if(!confirm('Xoá đợt dữ liệu này?')) return;
       await sDelete('batch:'+b.id);
-      BATCH_INDEX = BATCH_INDEX.filter(x=>x.id!==b.id);
-      await sSet('batches:index', BATCH_INDEX);
+      const ownerRole = b.enteredBy==='admin' ? 'admin' : 'user';
+      BATCH_INDEX_BY_ROLE[ownerRole] = BATCH_INDEX_BY_ROLE[ownerRole].filter(x=>x.id!==b.id);
+      await persistBatchIndex(ownerRole);
       renderBatchList();
       toast('Đã xoá đợt dữ liệu.');
     });
@@ -1484,18 +1807,39 @@ function renderStaffMasterTable(){
           </select>
         </td>
         <td><input type="number" step="0.05" class="inp-gtheso" data-idx="${i}" value="${s.gtHeso??1}" ${s.gtMode!=='heso'?'disabled':''}></td>
+        <td>
+          <select class="sel-nhomthunhap" data-idx="${i}">
+            <option value="gm" ${s.nhomThuNhap==='gm'?'selected':''}>Gây mê</option>
+            <option value="dc" ${s.nhomThuNhap==='dc'?'selected':''}>Dụng cụ</option>
+            <option value="khac" ${s.nhomThuNhap==='khac'?'selected':''}>Khác</option>
+          </select>
+        </td>
         <td><button class="btn warn small" data-idx="${i}" type="button">Xoá</button></td>
       </tr>`;
     }).join('');
     const isOpen = wasOpen[key]!==undefined ? wasOpen[key] : true;
     return `<details class="staffgroup" data-group="${key}" ${isOpen?'open':''}>
       <summary>${key} <span class="cnt">(${idxs.length} người)</span></summary>
+      <div class="toolbar" style="margin:8px 0 10px 0; align-items:center; background:#f6f2e9; padding:8px 10px; border-radius:6px;">
+        <div class="col" style="flex:0 0 auto; font-size:13px; color:#6b6558;">Đặt nhanh Nhóm thu nhập cho cả ${idxs.length} người trong "${key}":</div>
+        <div class="col" style="max-width:160px;">
+          <select class="bulk-nhom-select" data-group="${key}">
+            <option value="gm">Gây mê</option>
+            <option value="dc">Dụng cụ</option>
+            <option value="khac">Khác</option>
+          </select>
+        </div>
+        <div class="col" style="flex:0 0 auto;">
+          <button class="btn secondary small bulk-nhom-apply" data-group="${key}" type="button">Áp dụng cho cả nhóm</button>
+        </div>
+      </div>
       <div style="overflow:auto;">
       <table class="data">
         <thead><tr>
           <th>STT</th><th>Họ tên</th><th>Đơn nguyên</th><th>Chức vụ / Văn bằng</th>
           <th style="text-align:center;">Cọc 1</th><th style="text-align:center;">HC phòng mổ</th>
-          <th style="text-align:center;">Gián tiếp khác</th><th>Hưởng theo mức</th><th>Hệ số GT</th><th></th>
+          <th style="text-align:center;">Gián tiếp khác</th><th>Hưởng theo mức</th><th>Hệ số GT</th>
+          <th style="text-align:center;" title="Áp dụng khấu trừ % khi tính Thu nhập thực tế (tab Admin): Gây mê/Dụng cụ bị trừ, Khác giữ nguyên">Nhóm thu nhập</th><th></th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -1527,6 +1871,28 @@ function bindStaffTableEvents(){
   });
   document.querySelectorAll('.chk-gt').forEach(el=>el.onchange=async()=>{
     CONFIG.staffMaster[parseInt(el.dataset.idx)].giantiep = el.checked; await sSet('config:main',CONFIG);
+  });
+  document.querySelectorAll('.sel-nhomthunhap').forEach(el=>el.onchange=async()=>{
+    CONFIG.staffMaster[parseInt(el.dataset.idx)].nhomThuNhap = el.value; await sSet('config:main',CONFIG);
+  });
+  document.querySelectorAll('.bulk-nhom-apply').forEach(btn=>btn.onclick=async()=>{
+    const group = btn.dataset.group;
+    const sel = document.querySelector(`.bulk-nhom-select[data-group="${CSS.escape(group)}"]`);
+    const val = sel.value;
+    const label = val==='gm'?'Gây mê':(val==='dc'?'Dụng cụ':'Khác');
+    let count = 0;
+    CONFIG.staffMaster.forEach(s=>{
+      const key = s.donNguyen && s.donNguyen.trim() ? s.donNguyen : 'Khác';
+      if(key===group) count++;
+    });
+    if(!confirm(`Đặt TẤT CẢ ${count} người trong "${group}" thành nhóm "${label}"?\n\nSau khi áp dụng, anh vẫn có thể sửa tay riêng từng người (VD: các dụng cụ viên trong Phòng Mổ) ngay bên dưới.`)) return;
+    CONFIG.staffMaster.forEach(s=>{
+      const key = s.donNguyen && s.donNguyen.trim() ? s.donNguyen : 'Khác';
+      if(key===group) s.nhomThuNhap = val;
+    });
+    await sSet('config:main', CONFIG);
+    renderStaffMasterTable();
+    toast(`Đã đặt nhóm "${label}" cho ${count} người trong "${group}".`);
   });
   document.querySelectorAll('.sel-gtmode').forEach(el=>el.onchange=async()=>{
     CONFIG.staffMaster[parseInt(el.dataset.idx)].gtMode = el.value; await sSet('config:main',CONFIG);
@@ -1583,7 +1949,7 @@ function setupConfigHandlers(){
     if(!name) return;
     const donNguyen = document.getElementById('newStaffDN').value;
     const chucVu = document.getElementById('newStaffCV').value.trim();
-    CONFIG.staffMaster.push({name, donNguyen, chucVu, coc1:false, hcpm:false, giantiep:false, gtHeso:1, gtMode:'heso'});
+    CONFIG.staffMaster.push({name, donNguyen, chucVu, coc1:false, hcpm:false, giantiep:false, gtHeso:1, gtMode:'heso', nhomThuNhap: donNguyen==='Phòng Mổ' ? 'gm' : 'khac'});
     document.getElementById('newStaffName').value='';
     document.getElementById('newStaffCV').value='';
     await sSet('config:main', CONFIG);
@@ -2600,6 +2966,487 @@ function renderStatsCharts(){
 async function renderStats(){
   await renderMonthlyStats();
   await computeStatsRange();
+}
+
+/* ============================================================
+   THU NHẬP THỰC TẾ (ADMIN) — đối chiếu bảng chuyển khoản Tài vụ
+   Tính năng riêng của Admin: mỗi tháng tải file Excel Tài vụ chuyển
+   khoản thật, đối chiếu với Danh mục nhân viên Khoa (tab 2), tách
+   Nhóm Gây mê và Nhóm Dụng cụ đều bị trừ % chung; Nhóm khác giữ nguyên.
+   ============================================================ */
+let INCOME_INDEX = []; // [{id, month, filename, note, uploadedAt, countMatched, countUnmatched, totalChuyenKhoan, totalThucNhan}]
+let INCOME_PENDING = null; // {filename, month, rows:[{name,donNguyen,nhom,matched,chuyenKhoan,thucNhan}]}
+let INCOME_STATS = null;
+
+function detectIncomeMonth(aoa){
+  for(const row of aoa){
+    for(const cell of row){
+      if(typeof cell === 'string'){
+        const m = cell.match(/th[aá]ng\s*(\d{1,2})[\/\-](\d{4})/i);
+        if(m) return `${m[2]}-${m[1].padStart(2,'0')}`;
+      }
+    }
+  }
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+}
+
+function findIncomeColumns(aoa){
+  for(let r=0;r<Math.min(aoa.length,15);r++){
+    const row = aoa[r]||[];
+    let nameCol=-1, amountCol=-1;
+    row.forEach((cell,ci)=>{
+      if(typeof cell==='string'){
+        const t = cell.trim().toLowerCase();
+        if(nameCol<0 && t.includes('họ') && t.includes('tên')) nameCol=ci;
+        if(amountCol<0 && t.includes('số tiền')) amountCol=ci;
+      }
+    });
+    if(nameCol>=0 && amountCol>=0) return {headerRow:r, nameCol, amountCol};
+  }
+  // fallback theo mẫu chuẩn: STT, Họ và tên, Số tài khoản, Số tiền, Ghi chú
+  return {headerRow:2, nameCol:1, amountCol:3};
+}
+
+// Nhãn hiển thị cho 1 trong 3 nhóm thu nhập: Gây mê / Dụng cụ / Khác.
+function nhomThuNhapLabel(nhom){
+  if(nhom==='gm') return 'Gây mê';
+  if(nhom==='dc') return 'Dụng cụ';
+  return 'Khác';
+}
+// Nhóm Gây mê và Dụng cụ đều bị áp dụng khấu trừ % chung; chỉ Nhóm khác giữ nguyên.
+function nhomBiTruPhanTram(nhom){ return nhom==='gm' || nhom==='dc'; }
+
+function parseIncomeWorkbook(wb, filename){
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const aoa = XLSX.utils.sheet_to_json(sheet, {header:1, defval:null, raw:true});
+  const month = detectIncomeMonth(aoa);
+  const {headerRow, nameCol, amountCol} = findIncomeColumns(aoa);
+  const rosterByName = {};
+  CONFIG.staffMaster.forEach(s=> rosterByName[s.name.trim().toLowerCase()] = s);
+  const pct = (CONFIG.deductPct||0)/100;
+  const rows = [];
+  for(let r=headerRow+1; r<aoa.length; r++){
+    const row = aoa[r]||[];
+    const rawName = row[nameCol];
+    const rawAmount = row[amountCol];
+    if(typeof rawName !== 'string' || !rawName.trim()) continue;
+    const amount = typeof rawAmount==='number' ? rawAmount : parseFloat(rawAmount);
+    if(!amount || amount<=0 || isNaN(amount)) continue;
+    const name = rawName.trim();
+    const s = rosterByName[name.toLowerCase()];
+    const matched = !!s;
+    const nhom = matched ? (s.nhomThuNhap||'khac') : 'khac';
+    const chuyenKhoan = Math.round(amount);
+    const thucNhan = nhomBiTruPhanTram(nhom) ? Math.round(amount*(1-pct)) : chuyenKhoan;
+    rows.push({name, donNguyen: matched? (s.donNguyen||'') : '', matched, nhom, chuyenKhoan, thucNhan});
+  }
+  return {filename, month, rows};
+}
+
+function getIncomeGroupRank(r){
+  if(!r.matched) return 3;
+  return r.nhom==='gm' ? 0 : (r.nhom==='dc' ? 1 : 2);
+}
+// Lấy danh sách dòng xem trước theo bộ lọc nhóm đang chọn (Tất cả/Gây mê/Dụng cụ/Khác/Không thuộc danh mục),
+// đồng thời sắp Gây mê lên trước, rồi Dụng cụ, rồi Khác, cuối cùng là tên không thuộc danh mục — dễ rà soát khi danh sách dài.
+function getFilteredIncomePreviewRows(){
+  if(!INCOME_PENDING) return [];
+  const filterEl = document.getElementById('incomePreviewFilter');
+  const filter = filterEl ? filterEl.value : 'all';
+  let rows = INCOME_PENDING.rows.slice();
+  if(filter==='gm') rows = rows.filter(r=>r.matched && r.nhom==='gm');
+  else if(filter==='dc') rows = rows.filter(r=>r.matched && r.nhom==='dc');
+  else if(filter==='khac') rows = rows.filter(r=>r.matched && r.nhom==='khac');
+  else if(filter==='unmatched') rows = rows.filter(r=>!r.matched);
+  rows.sort((a,b)=> getIncomeGroupRank(a)-getIncomeGroupRank(b));
+  return rows;
+}
+
+function renderIncomePreview(){
+  if(!INCOME_PENDING) return;
+  document.getElementById('incomeFileNameLabel').textContent = INCOME_PENDING.filename;
+  const q = (INCOME_PENDING.queueTotal>1) ? `— File ${INCOME_PENDING.queuePos}/${INCOME_PENDING.queueTotal} trong hàng đợi` : '';
+  document.getElementById('incomeQueueLabel').textContent = q;
+  document.getElementById('incomeMonthInput').value = INCOME_PENDING.month;
+  document.getElementById('incomeDeductPctLabel').textContent = CONFIG.deductPct;
+  document.getElementById('incomePreviewFilter').value = 'all';
+  const matchedRows = INCOME_PENDING.rows.filter(r=>r.matched);
+  const unmatchedRows = INCOME_PENDING.rows.filter(r=>!r.matched);
+  const totalChuyenKhoan = matchedRows.reduce((s,r)=>s+r.chuyenKhoan,0);
+  const totalThucNhan = matchedRows.reduce((s,r)=>s+r.thucNhan,0);
+  document.getElementById('incomePreviewKpi').innerHTML = `
+    <div class="kpi"><div class="v">${matchedRows.length}</div><div class="l">Người khớp danh mục Khoa</div></div>
+    <div class="kpi"><div class="v">${unmatchedRows.length}</div><div class="l">Tên không thuộc danh mục (bỏ qua)</div></div>
+    <div class="kpi"><div class="v">${fmtNum(totalChuyenKhoan)}</div><div class="l">Tổng Tài vụ chuyển khoản</div></div>
+    <div class="kpi"><div class="v">${fmtNum(totalThucNhan)}</div><div class="l">Tổng Thực nhận (đã trừ ${CONFIG.deductPct}% nhóm Gây mê/Dụng cụ)</div></div>
+  `;
+  renderIncomePreviewTable();
+  document.getElementById('incomePreviewCard').style.display = '';
+  document.getElementById('incomePreviewCard').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// Chỉ vẽ lại bảng chi tiết (không vẽ lại KPI) — dùng khi đổi bộ lọc nhóm để phản hồi nhanh hơn.
+function renderIncomePreviewTable(){
+  if(!INCOME_PENDING) return;
+  const rows = getFilteredIncomePreviewRows();
+  const rowsHtml = rows.map((r,i)=>`
+    <tr style="${r.matched?'':'opacity:.55;'}">
+      <td>${i+1}</td>
+      <td>${r.name}</td>
+      <td>${r.matched ? nhomThuNhapLabel(r.nhom) : '—'}</td>
+      <td>${r.matched? '✔' : '✗ không thuộc danh mục'}</td>
+      <td class="num">${fmtNum(r.chuyenKhoan)}</td>
+      <td class="num">${r.matched? fmtNum(r.thucNhan) : '—'}</td>
+    </tr>`).join('');
+  document.getElementById('incomePreviewTable').innerHTML = `
+    <thead><tr><th>STT</th><th>Họ tên (theo file)</th><th>Nhóm</th><th>Trong danh mục?</th><th>Tài vụ chuyển khoản</th><th>Thực nhận (đã trừ ${CONFIG.deductPct}% nếu thuộc Gây mê/Dụng cụ)</th></tr></thead>
+    <tbody>${rowsHtml || '<tr><td colspan="6" class="muted" style="text-align:center;">Không có dòng nào khớp bộ lọc.</td></tr>'}</tbody>`;
+}
+
+// Xuất Excel danh sách XEM TRƯỚC (theo đúng bộ lọc nhóm đang chọn) — dùng để kiểm tra/đối chiếu trước khi lưu chính thức.
+function exportIncomePreviewExcel(){
+  if(!INCOME_PENDING){ toast('Chưa có file đang xem trước.'); return; }
+  const rows = getFilteredIncomePreviewRows();
+  const filterLabel = {all:'TatCa', gm:'GayMe', dc:'DungCu', khac:'Khac', unmatched:'KhongThuocDanhMuc'}[document.getElementById('incomePreviewFilter').value]||'TatCa';
+  const wsData = [
+    ['SỞ Y TẾ TỈNH GIA LAI'],['BỆNH VIỆN ĐA KHOA TRUNG TÂM'],
+    [`XEM TRƯỚC THU NHẬP THỰC TẾ — THÁNG ${INCOME_PENDING.month} (${INCOME_PENDING.filename})`],[],
+    ['STT','Họ tên','Nhóm','Trong danh mục?','Tài vụ chuyển khoản (đ)',`Thực nhận đã trừ ${CONFIG.deductPct}% nếu thuộc Gây mê/Dụng cụ (đ)`]
+  ];
+  rows.forEach((r,i)=> wsData.push([i+1, r.name, r.matched?nhomThuNhapLabel(r.nhom):'—', r.matched?'Có':'Không', r.chuyenKhoan, r.matched? r.thucNhan : '']));
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Xem truoc thu nhap');
+  XLSX.writeFile(wb, `XemTruocThuNhap_${INCOME_PENDING.month}_${filterLabel}.xlsx`);
+  toast('Đã xuất file Excel.');
+}
+
+// Xuất Word (định dạng .doc mở được bằng Microsoft Word) danh sách XEM TRƯỚC theo đúng bộ lọc nhóm đang chọn.
+function exportIncomePreviewWord(){
+  if(!INCOME_PENDING){ toast('Chưa có file đang xem trước.'); return; }
+  const rows = getFilteredIncomePreviewRows();
+  const filterLabel = {all:'TatCa', gm:'GayMe', dc:'DungCu', khac:'Khac', unmatched:'KhongThuocDanhMuc'}[document.getElementById('incomePreviewFilter').value]||'TatCa';
+  const trs = rows.map((r,i)=>`
+    <tr>
+      <td>${i+1}</td><td>${r.name}</td>
+      <td>${r.matched?nhomThuNhapLabel(r.nhom):'—'}</td>
+      <td>${r.matched?'Có':'Không'}</td>
+      <td align="right">${fmtNum(r.chuyenKhoan)}</td>
+      <td align="right">${r.matched? fmtNum(r.thucNhan) : ''}</td>
+    </tr>`).join('');
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+  <head><meta charset="utf-8"><title>Xem trước Thu nhập thực tế</title></head>
+  <body style="font-family:'Times New Roman',serif; font-size:13pt;">
+    <p style="text-align:center; font-weight:bold; margin:0;">SỞ Y TẾ TỈNH GIA LAI</p>
+    <p style="text-align:center; font-weight:bold; margin:0;">BỆNH VIỆN ĐA KHOA TRUNG TÂM</p>
+    <p style="text-align:center; font-weight:bold; margin:14px 0;">XEM TRƯỚC THU NHẬP THỰC TẾ — THÁNG ${INCOME_PENDING.month}</p>
+    <p>File nguồn: ${INCOME_PENDING.filename}</p>
+    <table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse; width:100%;">
+      <thead><tr style="font-weight:bold; background:#eee;">
+        <td>STT</td><td>Họ tên</td><td>Nhóm</td><td>Trong danh mục?</td><td>Tài vụ chuyển khoản (đ)</td><td>Thực nhận đã trừ ${CONFIG.deductPct}% (đ)</td>
+      </tr></thead>
+      <tbody>${trs}</tbody>
+    </table>
+  </body></html>`;
+  const blob = new Blob(['\ufeff', html], {type:'application/msword'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `XemTruocThuNhap_${INCOME_PENDING.month}_${filterLabel}.doc`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Đã xuất file Word.');
+}
+
+let INCOME_QUEUE_TOTAL = 0, INCOME_QUEUE_DONE = 0;
+
+function handleIncomeFiles(fileList){
+  const files = Array.from(fileList);
+  if(!files.length) return;
+  INCOME_QUEUE_TOTAL = files.length;
+  INCOME_QUEUE_DONE = 0;
+  processNextIncomeFile(files, 0);
+}
+
+function processNextIncomeFile(files, i){
+  if(i>=files.length) return;
+  const file = files[i];
+  const ext = (file.name.split('.').pop()||'').toLowerCase();
+  if(!['xlsx','xls','csv'].includes(ext)){
+    toast(`Không hỗ trợ định dạng ".${ext}" (${file.name}) — chỉ nhận .xlsx, .xls, .csv.`);
+    INCOME_QUEUE_DONE++;
+    processNextIncomeFile(files, i+1);
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    try{
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      INCOME_QUEUE_DONE++;
+      INCOME_PENDING = parseIncomeWorkbook(wb, file.name);
+      INCOME_PENDING.queuePos = INCOME_QUEUE_DONE;
+      INCOME_PENDING.queueTotal = INCOME_QUEUE_TOTAL;
+      INCOME_PENDING._remaining = files.slice(i+1);
+      renderIncomePreview();
+    }catch(err){
+      toast('Lỗi đọc file: '+file.name+' — '+(err.message||err));
+      INCOME_QUEUE_DONE++;
+      processNextIncomeFile(files, i+1);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function setupIncomeUpload(){
+  const dropZone = document.getElementById('incomeDropZone');
+  const fileInput = document.getElementById('incomeFileInput');
+  dropZone.addEventListener('click', ()=>fileInput.click());
+  dropZone.addEventListener('dragover', e=>{ e.preventDefault(); dropZone.classList.add('drag'); });
+  dropZone.addEventListener('dragleave', ()=> dropZone.classList.remove('drag'));
+  dropZone.addEventListener('drop', e=>{
+    e.preventDefault(); dropZone.classList.remove('drag');
+    if(e.dataTransfer.files.length) handleIncomeFiles(e.dataTransfer.files);
+  });
+  fileInput.addEventListener('change', e=>{
+    if(e.target.files.length) handleIncomeFiles(e.target.files);
+    fileInput.value = '';
+  });
+  document.getElementById('btnCancelIncome').addEventListener('click', ()=>{
+    const remaining = (INCOME_PENDING && INCOME_PENDING._remaining) || [];
+    INCOME_PENDING = null;
+    document.getElementById('incomePreviewCard').style.display = 'none';
+    if(remaining.length) toast(`Đã huỷ — còn ${remaining.length} file trong hàng đợi chưa xử lý, hãy tải lại nếu cần.`);
+  });
+  document.getElementById('btnSaveIncomeBatch').addEventListener('click', saveIncomeBatch);
+  document.getElementById('incomePreviewFilter').addEventListener('change', renderIncomePreviewTable);
+  document.getElementById('btnExportIncomePreviewExcel').addEventListener('click', exportIncomePreviewExcel);
+  document.getElementById('btnExportIncomePreviewWord').addEventListener('click', exportIncomePreviewWord);
+  document.getElementById('btnIncomeStatsCompute').addEventListener('click', computeIncomeStats);
+  document.getElementById('btnIncomeStatsExport').addEventListener('click', exportIncomeStatsExcel);
+  document.getElementById('incomeTopCount').addEventListener('change', renderIncomeStats);
+  document.getElementById('incomeStaffViewMode').addEventListener('change', renderIncomeStats);
+}
+
+async function saveIncomeBatch(){
+  if(!INCOME_PENDING) return;
+  const month = document.getElementById('incomeMonthInput').value || INCOME_PENDING.month;
+  const note = document.getElementById('incomeNote').value.trim();
+  const matchedRows = INCOME_PENDING.rows.filter(r=>r.matched)
+    .map(r=>({name:r.name, donNguyen:r.donNguyen, nhom:r.nhom, chuyenKhoan:r.chuyenKhoan, thucNhan:r.thucNhan}));
+  if(!matchedRows.length){ toast('Không có nhân viên nào khớp danh mục Khoa — kiểm tra lại file hoặc danh mục.'); return; }
+  const dup = INCOME_INDEX.find(b=>b.month===month && b.filename===INCOME_PENDING.filename);
+  if(dup){
+    const proceed = confirm(`⚠ Đã có đợt thu nhập tháng ${month} cùng tên file "${INCOME_PENDING.filename}" được lưu trước đó.\n\nBấm OK nếu chắc chắn muốn lưu thêm (số liệu có thể bị nhân đôi khi thống kê), hoặc Cancel để huỷ.`);
+    if(!proceed){ toast('Đã huỷ lưu — kiểm tra lại file đang chọn.'); return; }
+  }
+  const id = 'inc_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  const totalChuyenKhoan = matchedRows.reduce((s,r)=>s+r.chuyenKhoan,0);
+  const totalThucNhan = matchedRows.reduce((s,r)=>s+r.thucNhan,0);
+  const batch = {id, month, filename:INCOME_PENDING.filename, note, uploadedAt:new Date().toISOString(), rows:matchedRows};
+  const ok = await sSet('income:'+id, batch);
+  if(!ok){ toast(storageErrorMessage(), 10000); return; }
+  INCOME_INDEX.push({id, month, filename:batch.filename, note, uploadedAt:batch.uploadedAt,
+    countMatched:matchedRows.length, countUnmatched: INCOME_PENDING.rows.length-matchedRows.length,
+    totalChuyenKhoan, totalThucNhan});
+  const idxOk = await sSet('income:index', INCOME_INDEX);
+  if(!idxOk){ toast(storageErrorMessage(), 10000); await sDelete('income:'+id); INCOME_INDEX.pop(); return; }
+  toast(`Đã lưu đợt thu nhập tháng ${month} — ${matchedRows.length} người.`);
+  renderIncomeBatchList();
+  const remaining = INCOME_PENDING._remaining||[];
+  INCOME_PENDING = null;
+  document.getElementById('incomePreviewCard').style.display = 'none';
+  document.getElementById('incomeNote').value = '';
+  if(remaining.length){
+    toast(`Đang mở file tiếp theo trong hàng đợi: ${remaining[0].name} (còn ${remaining.length} file)`);
+    processNextIncomeFile(remaining, 0);
+  }
+}
+
+function renderIncomeBatchList(){
+  const el = document.getElementById('incomeBatchList');
+  if(!INCOME_INDEX.length){ el.innerHTML = '<p class="muted">Chưa có đợt thu nhập nào.</p>'; return; }
+  el.innerHTML = '';
+  INCOME_INDEX.slice().sort((a,b)=> b.month.localeCompare(a.month) || new Date(b.uploadedAt)-new Date(a.uploadedAt)).forEach(b=>{
+    const wrap = document.createElement('div');
+    wrap.className = 'b';
+    wrap.innerHTML = `<div><b>Tháng ${b.month}</b> <span class="pill">${b.filename}</span> <span class="muted">${b.countMatched} người${b.countUnmatched? ` · ${b.countUnmatched} tên bỏ qua (ngoài danh mục)`:''} · Chuyển khoản ${fmtNum(b.totalChuyenKhoan)} đ · Thực nhận ${fmtNum(b.totalThucNhan)} đ${b.note? (' · '+b.note):''}</span></div>
+      <div style="display:flex; gap:6px;">
+        <button class="btn secondary small" data-dl="${b.id}" type="button">⬇ Tải lại Excel</button>
+        <button class="btn warn small" data-del="${b.id}" type="button">Xoá</button>
+      </div>`;
+    wrap.querySelector('[data-dl]').addEventListener('click', ()=>downloadIncomeBatch(b.id));
+    wrap.querySelector('[data-del]').addEventListener('click', async ()=>{
+      if(!confirm('Xoá đợt thu nhập tháng '+b.month+'?')) return;
+      await sDelete('income:'+b.id);
+      INCOME_INDEX = INCOME_INDEX.filter(x=>x.id!==b.id);
+      await sSet('income:index', INCOME_INDEX);
+      renderIncomeBatchList();
+      toast('Đã xoá đợt thu nhập.');
+    });
+    el.appendChild(wrap);
+  });
+}
+
+// Tra cứu Nhóm thu nhập MỚI NHẤT theo tên trong Danh mục nhân viên hiện tại (tab 2) — luôn ưu tiên phân loại
+// hiện tại thay vì phân loại đã "đóng băng" lúc lưu đợt trước đây. Điều này giúp:
+// (1) Các đợt đã lưu TRƯỚC KHI có 3 nhóm riêng (chỉ có cờ Có/Không GM-DC) vẫn lọc đúng theo Gây mê/Dụng cụ/Khác.
+// (2) Nếu sau này Admin sửa lại nhóm của 1 người trong Danh mục, thống kê/lọc sẽ tự cập nhật theo, không cần tải lại file cũ.
+function currentNhomForName(name, legacyFallback){
+  const s = CONFIG.staffMaster.find(x=>x.name.trim().toLowerCase()===name.trim().toLowerCase());
+  if(s && s.nhomThuNhap) return s.nhomThuNhap;
+  if(legacyFallback) return legacyFallback;
+  return 'khac';
+}
+// Suy ra nhóm dự phòng từ 1 dòng dữ liệu cũ đã lưu (có thể là trường "nhom" mới, hoặc cờ "nhomGMDC" boolean của bản trước).
+function legacyNhomFromRow(r){
+  if(r.nhom) return r.nhom;
+  if(r.nhomGMDC !== undefined) return r.nhomGMDC ? 'gm' : 'khac';
+  return undefined;
+}
+
+async function downloadIncomeBatch(id){
+  const batch = await sGet('income:'+id);
+  if(!batch){ toast('Không tìm thấy dữ liệu đợt này.'); return; }
+  const wsData = [
+    ['SỞ Y TẾ TỈNH GIA LAI'],['BỆNH VIỆN ĐA KHOA TRUNG TÂM'],
+    [`THU NHẬP THỰC TẾ — THÁNG ${batch.month}`, batch.note||''],[],
+    ['STT','Họ và tên','Đơn nguyên','Nhóm','Tài vụ chuyển khoản (đ)','Thực nhận (đ)']
+  ];
+  batch.rows.forEach((r,i)=> wsData.push([i+1, r.name, r.donNguyen||'', nhomThuNhapLabel(currentNhomForName(r.name, legacyNhomFromRow(r))), r.chuyenKhoan, r.thucNhan]));
+  const totalCK = batch.rows.reduce((s,r)=>s+r.chuyenKhoan,0);
+  const totalTN = batch.rows.reduce((s,r)=>s+r.thucNhan,0);
+  wsData.push([]);
+  wsData.push(['','TỔNG CỘNG','','', totalCK, totalTN]);
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Thu nhap thuc te');
+  XLSX.writeFile(wb, `ThuNhapThucTe_${batch.month}.xlsx`);
+}
+
+function incomeMonthsBetween(fromM, toM){
+  const [yf,mf] = fromM.split('-').map(Number);
+  const [yt,mt] = toM.split('-').map(Number);
+  return Math.max(1, (yt-yf)*12 + (mt-mf) + 1);
+}
+
+async function computeIncomeStats(){
+  const from = document.getElementById('incomeStatsFrom').value;
+  const to = document.getElementById('incomeStatsTo').value;
+  if(!from || !to){ toast('Chọn đủ Từ tháng và Đến tháng.'); return; }
+  const relevant = INCOME_INDEX.filter(b=> b.month>=from && b.month<=to);
+  const batches = [];
+  for(const meta of relevant){
+    const b = await sGet('income:'+meta.id);
+    if(b) batches.push(b);
+  }
+  const numMonths = incomeMonthsBetween(from, to);
+  const perStaff = {}; // name -> {nhom, months:{month:{ck,tn}}, totalCK, totalTN}
+  const byGroup = {gm:{ck:0,tn:0}, dc:{ck:0,tn:0}, khac:{ck:0,tn:0}};
+  const byMonth = {}; // month -> {ck,tn}
+  batches.forEach(b=>{
+    b.rows.forEach(r=>{
+      const nhom = currentNhomForName(r.name, legacyNhomFromRow(r));
+      if(!perStaff[r.name]) perStaff[r.name] = {nhom, months:{}, totalCK:0, totalTN:0};
+      const p = perStaff[r.name];
+      p.months[b.month] = p.months[b.month] || {ck:0,tn:0};
+      p.months[b.month].ck += r.chuyenKhoan;
+      p.months[b.month].tn += r.thucNhan;
+      p.totalCK += r.chuyenKhoan;
+      p.totalTN += r.thucNhan;
+      const g = nhom==='gm' ? 'gm' : (nhom==='dc' ? 'dc' : 'khac');
+      byGroup[g].ck += r.chuyenKhoan;
+      byGroup[g].tn += r.thucNhan;
+      byMonth[b.month] = byMonth[b.month] || {ck:0,tn:0};
+      byMonth[b.month].ck += r.chuyenKhoan;
+      byMonth[b.month].tn += r.thucNhan;
+    });
+  });
+  INCOME_STATS = {from, to, numMonths, perStaff, byGroup, byMonth, batches};
+  renderIncomeStats();
+}
+
+// Lọc danh sách tên nhân viên trong INCOME_STATS.perStaff theo bộ lọc "Xem theo" đang chọn
+// (dùng chung cho cả bảng hiển thị và khi xuất Excel, để luôn khớp với những gì đang xem trên màn hình).
+function getFilteredIncomeStaffNames(res){
+  const modeEl = document.getElementById('incomeStaffViewMode');
+  const mode = modeEl ? modeEl.value : 'all';
+  let names = Object.keys(res.perStaff);
+  if(mode==='gm') names = names.filter(n=>res.perStaff[n].nhom==='gm');
+  else if(mode==='dc') names = names.filter(n=>res.perStaff[n].nhom==='dc');
+  else if(mode==='khac') names = names.filter(n=>res.perStaff[n].nhom==='khac');
+  return names.sort((a,b)=>res.perStaff[b].totalTN-res.perStaff[a].totalTN);
+}
+
+function renderIncomeStats(){
+  const res = INCOME_STATS;
+  const kpiEl = document.getElementById('incomeStatsKpi');
+  if(!res || !Object.keys(res.perStaff).length){
+    kpiEl.innerHTML = '<p class="muted">Chưa có dữ liệu — chọn khoảng tháng có đợt thu nhập đã lưu rồi bấm "Tính thống kê".</p>';
+    document.getElementById('incomeGroupTable').innerHTML='';
+    document.getElementById('incomeTopChart').innerHTML='';
+    document.getElementById('incomeMonthChart').innerHTML='';
+    document.getElementById('incomeStaffTable').innerHTML='';
+    return;
+  }
+  const totalCK = res.byGroup.gm.ck + res.byGroup.dc.ck + res.byGroup.khac.ck;
+  const totalTN = res.byGroup.gm.tn + res.byGroup.dc.tn + res.byGroup.khac.tn;
+  kpiEl.innerHTML = `
+    <div class="kpi"><div class="v">${res.numMonths}</div><div class="l">Số tháng đã chọn</div></div>
+    <div class="kpi"><div class="v">${fmtNum(totalCK)}</div><div class="l">Tổng Tài vụ chuyển khoản</div></div>
+    <div class="kpi"><div class="v">${fmtNum(totalTN)}</div><div class="l">Tổng Thực nhận toàn khoa</div></div>
+    <div class="kpi"><div class="v">${fmtNum(Math.round(totalTN/res.numMonths))}</div><div class="l">TB Thực nhận / tháng</div></div>
+  `;
+  document.getElementById('incomeGroupTable').innerHTML = `
+    <thead><tr><th>Nhóm</th><th>Tổng chuyển khoản</th><th>Tổng thực nhận</th><th>TB thực nhận/tháng</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td>Gây mê</td><td class="num">${fmtNum(res.byGroup.gm.ck)}</td><td class="num">${fmtNum(res.byGroup.gm.tn)}</td><td class="num">${fmtNum(Math.round(res.byGroup.gm.tn/res.numMonths))}</td><td class="muted">Đã trừ ${CONFIG.deductPct}%</td></tr>
+      <tr><td>Dụng cụ</td><td class="num">${fmtNum(res.byGroup.dc.ck)}</td><td class="num">${fmtNum(res.byGroup.dc.tn)}</td><td class="num">${fmtNum(Math.round(res.byGroup.dc.tn/res.numMonths))}</td><td class="muted">Đã trừ ${CONFIG.deductPct}%</td></tr>
+      <tr><td>Khác</td><td class="num">${fmtNum(res.byGroup.khac.ck)}</td><td class="num">${fmtNum(res.byGroup.khac.tn)}</td><td class="num">${fmtNum(Math.round(res.byGroup.khac.tn/res.numMonths))}</td><td class="muted">Giữ nguyên, không trừ %</td></tr>
+    </tbody>`;
+
+  const topCountVal = document.getElementById('incomeTopCount').value;
+  const staffList = Object.keys(res.perStaff).map(name=>({n:name, v:res.perStaff[name].totalTN})).sort((a,b)=>b.v-a.v);
+  const topN = topCountVal==='all' ? staffList.length : parseInt(topCountVal);
+  barChart(document.getElementById('incomeTopChart'), staffList, topN);
+
+  const monthData = Object.keys(res.byMonth).sort().map(m=>({n:m, v:res.byMonth[m].tn}));
+  barChart(document.getElementById('incomeMonthChart'), monthData, 24);
+
+  const staffNames = getFilteredIncomeStaffNames(res);
+  const staffRows = staffNames.map((name,i)=>{
+    const p = res.perStaff[name];
+    return `<tr><td>${i+1}</td><td>${name}</td><td>${nhomThuNhapLabel(p.nhom)}</td><td class="num">${fmtNum(p.totalCK)}</td><td class="num">${fmtNum(p.totalTN)}</td><td class="num">${fmtNum(Math.round(p.totalTN/res.numMonths))}</td></tr>`;
+  }).join('');
+  document.getElementById('incomeStaffTable').innerHTML = `
+    <thead><tr><th>STT</th><th>Họ tên</th><th>Nhóm</th><th>Tổng chuyển khoản</th><th>Tổng thực nhận</th><th>TB thực nhận/tháng</th></tr></thead>
+    <tbody>${staffRows || '<tr><td colspan="6" class="muted" style="text-align:center;">Không có nhân viên nào khớp bộ lọc. Nếu đang lọc Gây mê/Dụng cụ mà trống: vào tab 2 → Danh mục nhân viên, kiểm tra lại cột "Nhóm thu nhập" đã phân loại đúng người chưa (mặc định ban đầu đang gán tạm hết vào Gây mê).</td></tr>'}</tbody>`;
+}
+
+function exportIncomeStatsExcel(){
+  const res = INCOME_STATS;
+  if(!res || !Object.keys(res.perStaff).length){ toast('Chưa có dữ liệu để xuất.'); return; }
+  const months = Object.keys(res.byMonth).sort();
+  const staffNames = getFilteredIncomeStaffNames(res);
+  const modeEl = document.getElementById('incomeStaffViewMode');
+  const filterLabel = {all:'TatCa', gm:'GayMe', dc:'DungCu', khac:'Khac'}[modeEl?modeEl.value:'all']||'TatCa';
+  const wsData = [
+    ['SỞ Y TẾ TỈNH GIA LAI'],['BỆNH VIỆN ĐA KHOA TRUNG TÂM'],
+    [`THỐNG KÊ THU NHẬP THỰC TẾ (Từ ${res.from} đến ${res.to} — ${res.numMonths} tháng)`],[],
+    ['Họ tên','Nhóm', ...months.map(m=>'TN '+m), 'Tổng chuyển khoản','Tổng thực nhận','TB thực nhận/tháng']
+  ];
+  staffNames.forEach(name=>{
+    const p = res.perStaff[name];
+    const monthVals = months.map(m=> (p.months[m]? p.months[m].tn : 0));
+    wsData.push([name, nhomThuNhapLabel(p.nhom), ...monthVals, p.totalCK, p.totalTN, Math.round(p.totalTN/res.numMonths)]);
+  });
+  wsData.push([]);
+  wsData.push(['TỔNG KHOA','', ...months.map(m=>res.byMonth[m].tn), res.byGroup.gm.ck+res.byGroup.dc.ck+res.byGroup.khac.ck, res.byGroup.gm.tn+res.byGroup.dc.tn+res.byGroup.khac.tn]);
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Thong ke thu nhap');
+  XLSX.writeFile(wb, `ThongKeThuNhapThucTe_${res.from}_${res.to}_${filterLabel}.xlsx`);
+  toast('Đã xuất file Excel.');
 }
 
 init();
