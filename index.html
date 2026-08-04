@@ -267,7 +267,7 @@
     </details>
 
     <div class="card">
-      <h2>Các đợt dữ liệu đã lưu</h2>
+      <h2>Các đợt dữ liệu đã lưu <button class="btn secondary small" id="btnExportAllBatches" type="button" style="margin-left:8px;">⬇ Xuất tất cả các đợt (gộp 1 file)</button></h2>
       <div class="batchlist" id="batchList"><p class="muted">Chưa có đợt dữ liệu nào.</p></div>
     </div>
   </section>
@@ -413,6 +413,10 @@
             <option value="total">Chỉ tổng cộng</option>
             <option value="detail">Chi tiết theo nhóm GM/DC</option>
           </select>
+        </div>
+        <div class="col" style="max-width:220px;">
+          <label>Tìm tên nhân viên</label>
+          <input type="text" id="summarySearch" placeholder="Gõ tên để lọc...">
         </div>
         <div class="col" style="flex:0; align-self:end;"><button class="btn secondary small" id="btnExportExcel2" type="button">⬇ Xuất Excel</button></div>
         <div class="col" style="flex:0; align-self:end;"><button class="btn secondary small" id="btnExportWord2" type="button">⬇ Xuất Word</button></div>
@@ -1141,6 +1145,7 @@ async function init(){
   renderExemptTable();
   renderStaffMasterTable();
   renderBatchList();
+  document.getElementById('btnExportAllBatches').addEventListener('click', exportAllBatches);
   renderIncomeBatchList();
   setupTabs();
   setupImport();
@@ -1644,6 +1649,29 @@ async function saveBatchFromMapping(){
   }
 }
 
+/* Xuất toàn bộ các đợt dữ liệu đã lưu (mỗi đợt 1 sheet) để đối chiếu với file HIS gốc */
+async function exportAllBatches(){
+  if(!BATCH_INDEX.length){ toast('Chưa có đợt dữ liệu nào để xuất.'); return; }
+  const headerRow = ['Mã ca','Ngày BĐ','Loại PTTT','Mã QĐ','Tên dịch vụ','Cột 50%','Cột 80%','Chính 1','Chính 2 (GM Chính)','Phụ 1','Phụ 2','Phụ 3','Phụ 4 (DC Vòng Trong)','Giúp 1'];
+  const wb = XLSX.utils.book_new();
+  const sorted = BATCH_INDEX.slice().sort((a,b)=> new Date(a.uploadedAt)-new Date(b.uploadedAt));
+  let usedNames = new Set();
+  for(const b of sorted){
+    const full = await sGet('batch:'+b.id);
+    if(!full || !full.rows) continue;
+    const wsData = [[`${full.filename} (${full.from} → ${full.to}) — ${full.rows.length} ca`], headerRow];
+    full.rows.forEach(r=> wsData.push([r.caseId,r.ngay,r.loaiP,r.maQD,r.tenDV,r.pct50,r.pct80,r.chinh1,r.chinh2,r.phu1,r.phu2,r.phu3,r.phu4,r.giup1]));
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    let sheetName = (full.filename||'batch').replace(/\.[^.]+$/,'').replace(/[\[\]\*\/\\\?:]/g,'_').slice(0,28) || 'DotDuLieu';
+    let unique = sheetName, n=1;
+    while(usedNames.has(unique)){ n++; unique = sheetName+'_'+n; }
+    usedNames.add(unique);
+    XLSX.utils.book_append_sheet(wb, ws, unique);
+  }
+  XLSX.writeFile(wb, `TatCaDuLieuGoc_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('Đã xuất tất cả '+sorted.length+' đợt dữ liệu — mỗi đợt 1 sheet.');
+}
+
 function renderBatchList(){
   const el = document.getElementById('batchList');
   if(!BATCH_INDEX.length){ el.innerHTML='<p class="muted">Chưa có đợt dữ liệu nào.</p>'; return; }
@@ -1661,7 +1689,7 @@ function renderBatchList(){
         <div><b>${b.filename}</b> <span class="pill">${b.from} → ${b.to}</span> <span class="pill">${b.enteredBy==='admin'?'🔑 Admin':'👤 User'}</span> <span class="muted">${b.count} ca ${b.note?(' · '+b.note):''}</span>
           ${exempt.length? `<span class="flag">${exempt.length} ca không tính tiền (miễn trừ)</span>`:''}
         </div>
-        <div><button class="btn warn small" data-id="${b.id}">Xoá</button></div>
+        <div><button class="btn secondary small" data-export="${b.id}" type="button">⬇ Xuất Excel</button> <button class="btn warn small" data-id="${b.id}">Xoá</button></div>
       </div>
       ${exempt.length? `<details style="margin:-4px 0 8px 0;">
         <summary class="muted" style="cursor:pointer;">Xem danh sách ${exempt.length} trường hợp không tính tiền của đợt này</summary>
@@ -1670,6 +1698,23 @@ function renderBatchList(){
           <tbody>${exemptRowsHtml}</tbody>
         </table></div>
       </details>`:''}`;
+    wrap.querySelector('button[data-export]').addEventListener('click', async ()=>{
+      const full = await sGet('batch:'+b.id);
+      if(!full || !full.rows){ toast('Không tải được dữ liệu đợt này.'); return; }
+      const headerRow = ['Mã ca','Ngày BĐ','Loại PTTT','Mã QĐ','Tên dịch vụ','Cột 50%','Cột 80%','Chính 1','Chính 2 (GM Chính)','Phụ 1','Phụ 2','Phụ 3','Phụ 4 (DC Vòng Trong)','Giúp 1'];
+      const wsData = [
+        ['SỞ Y TẾ TỈNH GIA LAI'],['BỆNH VIỆN ĐA KHOA TRUNG TÂM'],
+        [`DỮ LIỆU GỐC ĐÃ LƯU — ${full.filename} (${full.from} → ${full.to})`],[],
+        headerRow
+      ];
+      full.rows.forEach(r=> wsData.push([r.caseId,r.ngay,r.loaiP,r.maQD,r.tenDV,r.pct50,r.pct80,r.chinh1,r.chinh2,r.phu1,r.phu2,r.phu3,r.phu4,r.giup1]));
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Du lieu goc');
+      const safeName = (full.filename||'batch').replace(/\.[^.]+$/,'').replace(/[^\w\-]+/g,'_');
+      XLSX.writeFile(wb, `DuLieuGoc_${safeName}_${full.from}_${full.to}.xlsx`);
+      toast('Đã xuất dữ liệu gốc của đợt "'+full.filename+'".');
+    });
     wrap.querySelector('button[data-id]').addEventListener('click', async ()=>{
       if(!confirm('Xoá đợt dữ liệu này?')) return;
       await sDelete('batch:'+b.id);
@@ -2120,6 +2165,7 @@ function setupSummaryHandlers(){
   document.getElementById('coc1OnlySelected').addEventListener('change', ()=>applyPickFilter('coc1Pick','coc1Search','coc1OnlySelected','coc1CountInfo'));
   document.getElementById('hcpmOnlySelected').addEventListener('change', ()=>applyPickFilter('hcpmPick','hcpmSearch','hcpmOnlySelected','hcpmCountInfo'));
   document.getElementById('groupViewMode').addEventListener('change', applyGroupViewMode);
+  document.getElementById('summarySearch').addEventListener('input', applyGroupViewMode);
 }
 
 async function runSummary(){
@@ -2224,6 +2270,10 @@ function applyGroupViewMode(){
   if(mode==='gm'){ rows = rows.filter(r=>r.gm>0).sort((a,b)=>b.gm-a.gm); }
   else if(mode==='dc'){ rows = rows.filter(r=>r.dc>0).sort((a,b)=>b.dc-a.dc); }
   // mode 'all' giữ nguyên thứ tự res.list (đã sắp xếp theo tổng giảm dần)
+
+  const searchEl = document.getElementById('summarySearch');
+  const search = searchEl ? searchEl.value.trim().toLowerCase() : '';
+  if(search){ rows = rows.filter(r=> r.name.toLowerCase().includes(search)); }
 
   let sumGm=0, sumDc=0, sumTotal=0, sumAfter=0;
   rows.forEach((r,i)=>{
