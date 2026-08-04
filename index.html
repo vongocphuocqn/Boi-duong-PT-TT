@@ -926,6 +926,7 @@ async function persistBatchIndex(role){
 }
 let PENDING = null; // {rows, headers, filename}
 let CURRENT_SUMMARY = null;
+let SUMMARY_NEEDS_RECOMPUTE = false; // bật lên khi dữ liệu batch thay đổi (lưu/xoá) -> tab Bảng tổng hợp sẽ tự tính lại khi mở
 
 /* ============================================================
    STORAGE HELPERS
@@ -1335,7 +1336,10 @@ function setupTabs(){
       btn.classList.add('active');
       document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
       if(btn.dataset.tab==='stats') renderStats();
-      if(btn.dataset.tab==='summary') renderGtPickLists();
+      if(btn.dataset.tab==='summary'){
+        renderGtPickLists();
+        maybeAutoRecomputeSummary();
+      }
     });
   });
 }
@@ -1637,6 +1641,7 @@ async function saveBatchFromMapping(){
   if(!ok){ toast(storageErrorMessage(), 10000); return; }
   BATCH_INDEX_BY_ROLE[CURRENT_ROLE].push({id, from, to, note:batch.note, uploadedAt:batch.uploadedAt, filename:batch.filename, count:rows.length, exemptCases, enteredBy:batch.enteredBy});
   await persistBatchIndex(CURRENT_ROLE);
+  SUMMARY_NEEDS_RECOMPUTE = true;
   toast(`Đã lưu đợt "${batch.filename}" — ${rows.length} ca${exemptCases.length? `, ${exemptCases.length} trường hợp không tính tiền theo quy tắc miễn trừ`:''}.`);
   renderBatchList();
   document.getElementById('mappingCard').style.display='none';
@@ -1721,6 +1726,7 @@ function renderBatchList(){
       const ownerRole = b.enteredBy==='admin' ? 'admin' : 'user';
       BATCH_INDEX_BY_ROLE[ownerRole] = BATCH_INDEX_BY_ROLE[ownerRole].filter(x=>x.id!==b.id);
       await persistBatchIndex(ownerRole);
+      SUMMARY_NEEDS_RECOMPUTE = true;
       renderBatchList();
       toast('Đã xoá đợt dữ liệu.');
     });
@@ -2166,6 +2172,18 @@ function setupSummaryHandlers(){
   document.getElementById('hcpmOnlySelected').addEventListener('change', ()=>applyPickFilter('hcpmPick','hcpmSearch','hcpmOnlySelected','hcpmCountInfo'));
   document.getElementById('groupViewMode').addEventListener('change', applyGroupViewMode);
   document.getElementById('summarySearch').addEventListener('input', applyGroupViewMode);
+}
+
+// Tự động tính lại "Bảng tổng hợp" khi phát hiện dữ liệu batch đã thay đổi (lưu thêm/xoá đợt)
+// kể từ lần tính gần nhất, để tránh trường hợp quên bấm "Tính tổng hợp" dẫn tới xem nhầm số liệu cũ.
+function maybeAutoRecomputeSummary(){
+  if(!SUMMARY_NEEDS_RECOMPUTE) return;
+  const from = document.getElementById('sumFrom').value;
+  const to = document.getElementById('sumTo').value;
+  if(!from || !to) return; // chưa từng chọn khoảng ngày -> để người dùng tự bấm lần đầu
+  SUMMARY_NEEDS_RECOMPUTE = false;
+  runSummary();
+  toast('⟳ Dữ liệu vừa thay đổi — đã tự động tính lại Bảng tổng hợp.', 5000);
 }
 
 async function runSummary(){
