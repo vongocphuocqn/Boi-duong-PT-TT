@@ -532,6 +532,35 @@
       </table></div>
       </div>
     </details>
+
+    <details class="card">
+      <summary>Danh sách ca thuộc Mã QĐ 12 / 14 (đã tính tiền bình thường — chỉ để đối chiếu)</summary>
+      <div class="card-body">
+      <p class="muted">Từ khi bỏ 2 quy tắc miễn trừ, các ca có Mã QĐ 12 (Loại II/III, cột Dụng cụ Vòng Trong) và Mã QĐ 14 (cột Gây mê Chính) đã được <b>tính tiền bình thường như mọi mã quyết định khác</b> — bảng dưới đây chỉ để anh/chị đối chiếu, kiểm tra tổng tiền, KHÔNG phải danh sách bị trừ tiền.</p>
+      <div style="margin-bottom:8px;"><button class="btn secondary small" id="btnExportInfoFlagExcel" type="button">⬇ Xuất Excel để đối chiếu</button></div>
+      <div style="overflow:auto;"><table class="data" id="infoFlagCasesTable">
+        <thead><tr><th>Mã ca</th><th>Họ tên</th><th>Ngày BĐ</th><th>Tên dịch vụ</th><th>Loại PTTT</th><th>Vai trò</th><th>Mã QĐ</th><th class="num">Số tiền đã tính</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary>🔍 Tra cứu chi tiết ca theo tên nhân viên (đối chiếu với file gốc)</summary>
+      <div class="card-body">
+      <p class="muted">Nhập đúng họ tên đầy đủ (theo file gốc/danh mục Khoa) để xem toàn bộ ca App đã ghi nhận cho người đó trong khoảng ngày đang tính — gồm cả ca đã tính tiền, ca bị miễn trừ, và ca ngoài danh mục. Dùng để đếm số ca và tổng tiền, đối chiếu trực tiếp với số ca đếm được trong file gốc (Ctrl+F).</p>
+      <div class="row" style="gap:8px; align-items:center; margin-bottom:8px;">
+        <input type="text" id="caseLookupName" placeholder="VD: Đinh Kim Vũ" style="max-width:320px;">
+        <button class="btn secondary small" id="btnCaseLookup" type="button">Tra cứu</button>
+        <button class="btn secondary small" id="btnExportCaseLookup" type="button">⬇ Xuất Excel</button>
+      </div>
+      <div id="caseLookupSummary" class="muted" style="margin-bottom:8px;"></div>
+      <div style="overflow:auto;"><table class="data" id="caseLookupTable">
+        <thead><tr><th>Mã ca</th><th>Ngày BĐ</th><th>Tên dịch vụ</th><th>Loại PTTT</th><th>Vai trò</th><th>Trạng thái</th><th class="num">Số tiền</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      </div>
+    </details>
   </section>
 
   <!-- ===================== TAB 4: STATS ===================== -->
@@ -908,10 +937,7 @@ let CONFIG = {
   rates: JSON.parse(JSON.stringify(DEFAULT_RATES)),
   deductPct: 6,
   staffMaster: [],
-  exemptRules: [
-    {maQD:'12', tiers:['P2','P3'], field:'phu4', note:'Không tính cột Dụng cụ Vòng Trong (sát Gây mê Phụ) khi Mã QĐ 12 và Loại II/III'},
-    {maQD:'14', tiers:[], field:'chinh2', note:'Không tính cột Gây mê Chính khi Mã QĐ 14 (liên quan phẫu thuật mắt)'}
-  ],
+  exemptRules: [],
   savedMappings: {}, // key: profile (vd 'da_hoan_thanh' / 'chua_hoan_thanh' / 'mac_dinh') -> mapping object
   seedVersion: 0,
 };
@@ -1300,6 +1326,12 @@ function migrateStaffConfig(){
       }
     });
     CONFIG.ruleVersion = 2;
+  }
+
+  // Theo yêu cầu: bỏ 2 quy tắc miễn trừ Mã QĐ 12 và 14, tính các ca này như bình thường (giống các Mã QĐ/chương khác), không loại trừ cột nào nữa
+  if(!(CONFIG.ruleVersion>=3)){
+    CONFIG.exemptRules = (CONFIG.exemptRules||[]).filter(rule=> rule.maQD!=='12' && rule.maQD!=='14');
+    CONFIG.ruleVersion = 3;
   }
 
   // migrate legacy single savedMapping into per-profile savedMappings
@@ -2020,6 +2052,27 @@ function rateFor(loaiP, role){
 }
 function isProcCode(loaiP){ const t=tierOf(loaiP); return t? t.isProc : false; }
 
+// Các ca thuộc Mã QĐ 12 (Loại II/III, cột Dụng cụ Vòng Trong) và Mã QĐ 14 (cột Gây mê Chính)
+// KHÔNG còn bị trừ tiền (đã bỏ theo yêu cầu) — chỉ dùng để LIỆT KÊ/ĐỐI CHIẾU cho dễ kiểm tra tổng tiền.
+const INFO_FLAG_RULES = [
+  {maQD:'12', tiers:['P2','P3'], field:'phu4', note:'Ca thuộc Mã QĐ 12, Loại II/III — cột Dụng cụ Vòng Trong (sát Gây mê Phụ); đã tính tiền bình thường, chỉ để đối chiếu'},
+  {maQD:'14', tiers:[], field:'chinh2', note:'Ca thuộc Mã QĐ 14 (liên quan phẫu thuật mắt) — cột Gây mê Chính; đã tính tiền bình thường, chỉ để đối chiếu'}
+];
+function infoFlaggedFieldsForRow(row){
+  const flagged = new Set();
+  const maQD = row.maQD ? String(row.maQD).trim() : '';
+  if(!maQD) return flagged;
+  const tier = tierOf(row.loaiP);
+  INFO_FLAG_RULES.forEach(rule=>{
+    if(!maQD.startsWith(String(rule.maQD).trim())) return;
+    if(rule.tiers && rule.tiers.length){
+      if(!tier || !rule.tiers.includes(tier.base)) return;
+    }
+    flagged.add(rule.field);
+  });
+  return flagged;
+}
+
 function excludedFieldsForRow(row){
   const excluded = new Set();
   // Nếu ca có dữ liệu ở cột 50% hoặc 80% -> miễn trừ toàn bộ ca (không tính tiền cho bất kỳ vai trò nào)
@@ -2042,11 +2095,11 @@ function excludedFieldsForRow(row){
 }
 
 async function loadBatchesInRange(from, to){
-  const fromD = from? new Date(from): null;
-  const toD = to? new Date(to): null;
+  const fromD = parseDateInputLocalStart(from);
+  const toD = parseDateInputLocalEnd(to);
   const relevant = BATCH_INDEX.filter(b=>{
     if(!fromD || !toD) return true;
-    return new Date(b.from) <= toD && new Date(b.to) >= fromD;
+    return parseDateInputLocalStart(b.from) <= toD && parseDateInputLocalEnd(b.to) >= fromD;
   });
   const batches = [];
   for(const meta of relevant){
@@ -2057,8 +2110,8 @@ async function loadBatchesInRange(from, to){
 }
 
 function computeEarningsFromBatches(batches, from, to){
-  const fromD = from? new Date(from): null;
-  const toD = to? new Date(to): null;
+  const fromD = parseDateInputLocalStart(from);
+  const toD = parseDateInputLocalEnd(to);
   const perStaff = {}; // name -> {total, gm, dc, khac}
   let totalPT=0, totalTT=0, totalGM=0, totalDC=0;
   const loaiPCount = {};
@@ -2077,6 +2130,8 @@ function computeEarningsFromBatches(batches, from, to){
   }
 
   const exemptions = [];
+  const infoFlags = []; // Mã QĐ 12/14 — KHÔNG bị trừ tiền, chỉ liệt kê để đối chiếu tổng tiền
+  const caseLog = []; // NHẬT KÝ TOÀN BỘ: mọi lượt tên xuất hiện ở bất kỳ vai trò nào, kèm trạng thái xử lý — dùng để tra cứu/đối chiếu theo từng nhân viên
 
   batches.forEach(batch=>{
     let inRangeCount=0;
@@ -2092,6 +2147,7 @@ function computeEarningsFromBatches(batches, from, to){
       const cPhu = rateFor(r.loaiP,'phu');
       const cGiup = rateFor(r.loaiP,'giup');
       const excluded = excludedFieldsForRow(r);
+      const infoFlagged = infoFlaggedFieldsForRow(r);
       const hasPct5080 = !!((r.pct50 && String(r.pct50).trim()) || (r.pct80 && String(r.pct80).trim()));
       let rowTotal = 0;
       const maybeAdd = (fieldKey, rawName, rate)=>{
@@ -2100,14 +2156,21 @@ function computeEarningsFromBatches(batches, from, to){
         if(!name) return;
         if(excluded.has(fieldKey)){
           exemptions.push({caseId:r.caseId, ngay:r.ngay, name, field:fieldKey, maQD:r.maQD, loaiP:r.loaiP, tenDV:r.tenDV||'', chinh2:r.chinh2||'', phu4:r.phu4||'', reason: hasPct5080 ? '50%/80%' : 'Mã QĐ'});
+          caseLog.push({caseId:r.caseId, ngay:r.ngay, name, field:fieldKey, loaiP:r.loaiP, tenDV:r.tenDV||'', amount:rate, status:'Miễn trừ (không tính)'});
           return;
         }
         if(!rosterNames.has(name.toLowerCase())){
           notInRoster.push({caseId:r.caseId, ngay:r.ngay, name, field:fieldKey, amount:rate});
+          caseLog.push({caseId:r.caseId, ngay:r.ngay, name, field:fieldKey, loaiP:r.loaiP, tenDV:r.tenDV||'', amount:rate, status:'Ngoài danh mục Khoa (không tính)'});
           return; // không tính tiền cho người không có trong danh mục khoa
         }
         add(name, rate, GROUP_OF_FIELD[fieldKey]);
         rowTotal += rate;
+        caseLog.push({caseId:r.caseId, ngay:r.ngay, name, field:fieldKey, loaiP:r.loaiP, tenDV:r.tenDV||'', amount:rate, status:'Đã tính'});
+        // Mã QĐ 12/14: KHÔNG trừ tiền nữa — nhưng vẫn ghi lại để đối chiếu tổng tiền
+        if(infoFlagged.has(fieldKey)){
+          infoFlags.push({caseId:r.caseId, ngay:r.ngay, name, field:fieldKey, maQD:r.maQD, loaiP:r.loaiP, tenDV:r.tenDV||'', amount:rate});
+        }
       };
       maybeAdd('chinh1', r.chinh1, cChinh);
       maybeAdd('chinh2', r.chinh2, cChinh);
@@ -2127,7 +2190,7 @@ function computeEarningsFromBatches(batches, from, to){
     afterDeduct: perStaff[name].total*(1-pct)
   })).sort((a,b)=>b.total-a.total);
 
-  return {list, totalPT, totalTT, totalGM, totalDC, loaiPCount, perBatchTotal, exemptions, notInRoster};
+  return {list, totalPT, totalTT, totalGM, totalDC, loaiPCount, perBatchTotal, exemptions, notInRoster, infoFlags, caseLog};
 }
 
 function fmtDateInput(d){
@@ -2135,6 +2198,21 @@ function fmtDateInput(d){
   const m = String(d.getMonth()+1).padStart(2,'0');
   const day = String(d.getDate()).padStart(2,'0');
   return `${y}-${m}-${day}`;
+}
+// Parse giá trị input[type=date] ('YYYY-MM-DD') thành mốc giờ ĐỊA PHƯƠNG (local), KHÔNG dùng new Date('YYYY-MM-DD')
+// vì chuỗi đó bị JS hiểu là 0h00 UTC (= 7h sáng giờ VN), lệch múi giờ so với ngày giờ ca mổ (được hiểu theo giờ địa phương)
+// -> gây mất ca xảy ra trước 7h sáng ngày đầu kỳ báo cáo. Luôn dùng cặp hàm này cho MỌI mốc "Từ ngày"/"Đến ngày" lọc theo r.ngay.
+function parseDateInputLocalStart(str){
+  if(!str) return null;
+  const m = String(str).trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(!m) return null;
+  return new Date(+m[1], +m[2]-1, +m[3], 0, 0, 0, 0);
+}
+function parseDateInputLocalEnd(str){
+  if(!str) return null;
+  const m = String(str).trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(!m) return null;
+  return new Date(+m[1], +m[2]-1, +m[3], 23, 59, 59, 999); // hết ngày (bao trọn cả ngày cuối kỳ, không cắt theo giờ)
 }
 function parseVNDate(s){
   if(!s) return null;
@@ -2162,6 +2240,10 @@ function setupSummaryHandlers(){
   document.getElementById('exportGroupMode').addEventListener('change', e=>{ document.getElementById('exportGroupMode2').value = e.target.value; });
   document.getElementById('exportGroupMode2').addEventListener('change', e=>{ document.getElementById('exportGroupMode').value = e.target.value; });
   document.getElementById('btnExportExemptExcel').addEventListener('click', exportExemptExcel);
+  document.getElementById('btnExportInfoFlagExcel').addEventListener('click', exportInfoFlagExcel);
+  document.getElementById('btnCaseLookup').addEventListener('click', runCaseLookup);
+  document.getElementById('btnExportCaseLookup').addEventListener('click', exportCaseLookupExcel);
+  document.getElementById('caseLookupName').addEventListener('keydown', e=>{ if(e.key==='Enter') runCaseLookup(); });
   document.getElementById('btnExportZaloExcel').addEventListener('click', exportZaloExcel);
   document.getElementById('btnExportZaloWord').addEventListener('click', exportZaloWord);
   document.getElementById('zaloTimeMode').addEventListener('change', toggleZaloTimeInputs);
@@ -2198,6 +2280,7 @@ async function runSummary(){
   renderKpis(res);
   renderBatchesUsedInfo(batches);
   renderExemptionCasesTable(res);
+  renderInfoFlagCasesTable(res);
   document.getElementById('notInRosterFrom').value = from;
   document.getElementById('notInRosterTo').value = to;
   NOT_IN_ROSTER_CACHE = res;
@@ -2232,6 +2315,100 @@ function renderExemptionCasesTable(res){
     tr.innerHTML = `<td>${e.caseId||''}</td><td>${e.name}</td><td>${e.ngay||''}</td><td>${e.tenDV||''}</td><td>${e.loaiP||''}</td><td>${FIELD_LABELS[e.field]||e.field}</td><td>${e.reason||''}</td><td>${e.maQD||''}</td><td>${e.chinh2||''}</td><td>${e.phu4||''}</td>`;
     tb.appendChild(tr);
   });
+}
+
+function normalizeNameKey(s){
+  return String(s||'').trim().toLowerCase();
+}
+
+function runCaseLookup(){
+  const nameInput = document.getElementById('caseLookupName').value;
+  const name = nameInput.trim();
+  const tb = document.querySelector('#caseLookupTable tbody');
+  const summaryEl = document.getElementById('caseLookupSummary');
+  tb.innerHTML = '';
+  if(!name){ summaryEl.textContent = 'Nhập tên cần tra cứu.'; return; }
+  if(!CURRENT_SUMMARY || !CURRENT_SUMMARY.caseLog){ summaryEl.textContent = 'Chưa có dữ liệu — hãy bấm "Tính tổng hợp" trước.'; return; }
+  const key = normalizeNameKey(name);
+  const rows = CURRENT_SUMMARY.caseLog.filter(e => normalizeNameKey(e.name) === key);
+  CASE_LOOKUP_CACHE = {name, rows};
+  if(!rows.length){
+    summaryEl.textContent = `Không tìm thấy ca nào cho "${name}" trong khoảng ngày đang tính (kiểm tra lại chính tả/khoảng ngày).`;
+    tb.innerHTML = '<tr><td colspan="7" class="muted">Không có dữ liệu.</td></tr>';
+    return;
+  }
+  let sumCounted = 0, countCounted = 0;
+  rows.slice().sort((a,b)=> (a.ngay||'').localeCompare(b.ngay||'')).forEach(e=>{
+    if(e.status==='Đã tính'){ sumCounted += e.amount||0; countCounted++; }
+    const tr = document.createElement('tr');
+    const badColor = e.status==='Đã tính' ? '' : 'color:var(--bad);';
+    tr.innerHTML = `<td>${e.caseId||''}</td><td>${e.ngay||''}</td><td>${e.tenDV||''}</td><td>${e.loaiP||''}</td><td>${FIELD_LABELS[e.field]||e.field}</td><td style="${badColor}">${e.status}</td><td class="num">${fmtNum(e.amount||0)}</td>`;
+    tb.appendChild(tr);
+  });
+  summaryEl.innerHTML = `<b>${name}</b>: tổng cộng <b>${rows.length} lượt</b> xuất hiện trong khoảng ngày này — trong đó <b>${countCounted} ca đã tính tiền</b> (tổng <b>${fmtNum(sumCounted)}đ</b>), ${rows.length-countCounted} lượt còn lại bị miễn trừ/ngoài danh mục (xem cột Trạng thái). So số 'lượt xuất hiện' này với số lần Ctrl+F đếm được trong file gốc để biết App có đọc thiếu dòng nào không.`;
+}
+
+function exportCaseLookupExcel(){
+  if(!CASE_LOOKUP_CACHE || !CASE_LOOKUP_CACHE.rows.length){ toast('Chưa có kết quả tra cứu để xuất — hãy Tra cứu trước.'); return; }
+  const {name, rows} = CASE_LOOKUP_CACHE;
+  const from = document.getElementById('sumFrom').value, to = document.getElementById('sumTo').value;
+  const wsData = [
+    ['SỞ Y TẾ TỈNH GIA LAI'],['BỆNH VIỆN ĐA KHOA TRUNG TÂM'],
+    [`TRA CỨU CHI TIẾT CA — ${name} — Từ ${from} đến ${to}`],[],
+    ['Mã ca','Ngày BĐ','Tên dịch vụ','Loại PTTT','Vai trò','Trạng thái','Số tiền']
+  ];
+  rows.slice().sort((a,b)=> (a.ngay||'').localeCompare(b.ngay||'')).forEach(e=>{
+    wsData.push([e.caseId||'', e.ngay||'', e.tenDV||'', e.loaiP||'', FIELD_LABELS[e.field]||e.field, e.status, e.amount||0]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Tra cuu ca nhan');
+  XLSX.writeFile(wb, `TraCuu_${name.replace(/\s+/g,'_')}_${from}_${to}.xlsx`);
+  toast('Đã xuất file Excel tra cứu.');
+}
+let CASE_LOOKUP_CACHE = null;
+
+function renderInfoFlagCasesTable(res){
+  const tb = document.querySelector('#infoFlagCasesTable tbody');
+  if(!tb) return;
+  tb.innerHTML='';
+  const rows = res.infoFlags||[];
+  if(!rows.length){
+    tb.innerHTML = '<tr><td colspan="8" class="muted">Không có ca nào thuộc Mã QĐ 12/14 trong khoảng ngày này.</td></tr>';
+    return;
+  }
+  let sum = 0;
+  rows.forEach(e=>{
+    sum += e.amount||0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${e.caseId||''}</td><td>${e.name}</td><td>${e.ngay||''}</td><td>${e.tenDV||''}</td><td>${e.loaiP||''}</td><td>${FIELD_LABELS[e.field]||e.field}</td><td>${e.maQD||''}</td><td class="num">${fmtNum(e.amount||0)}</td>`;
+    tb.appendChild(tr);
+  });
+  const trSum = document.createElement('tr');
+  trSum.innerHTML = `<td colspan="7" style="text-align:right;"><b>Tổng cộng (đã tính vào lương)</b></td><td class="num"><b>${fmtNum(sum)}</b></td>`;
+  tb.appendChild(trSum);
+}
+
+function exportInfoFlagExcel(){
+  const rows = (CURRENT_SUMMARY && CURRENT_SUMMARY.infoFlags) || [];
+  if(!rows.length){ toast('Chưa có dữ liệu để xuất — hãy tính bảng tổng hợp trước.'); return; }
+  const from = document.getElementById('sumFrom').value, to = document.getElementById('sumTo').value;
+  const wsData = [
+    ['SỞ Y TẾ TỈNH GIA LAI'],['BỆNH VIỆN ĐA KHOA TRUNG TÂM'],
+    [`DANH SÁCH CA THUỘC MÃ QĐ 12/14 — ĐÃ TÍNH TIỀN BÌNH THƯỜNG, CHỈ ĐỂ ĐỐI CHIẾU — Từ ${from} đến ${to}`],[],
+    ['Mã ca','Họ tên','Ngày BĐ','Tên dịch vụ','Loại PTTT','Vai trò','Mã QĐ','Số tiền đã tính']
+  ];
+  let sum = 0;
+  rows.forEach(e=>{
+    sum += e.amount||0;
+    wsData.push([e.caseId||'', e.name, e.ngay||'', e.tenDV||'', e.loaiP||'', FIELD_LABELS[e.field]||e.field, e.maQD||'', e.amount||0]);
+  });
+  wsData.push(['','','','','','','Tổng cộng', sum]);
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Doi chieu Ma QD 12-14');
+  XLSX.writeFile(wb, `DoiChieu_MaQD_12_14_${from}_${to}.xlsx`);
+  toast('Đã xuất file Excel — đối chiếu các ca thuộc Mã QĐ 12/14.');
 }
 
 function exportExemptExcel(){
@@ -2875,8 +3052,8 @@ async function computeMonthlyBreakdown(fromStr, toStr){
     if(b) allBatches.push(b);
   }
   const rosterNames = new Set(CONFIG.staffMaster.map(s=>s.name.trim().toLowerCase()));
-  const fromD = fromStr? new Date(fromStr): null;
-  const toD = toStr? new Date(toStr): null;
+  const fromD = parseDateInputLocalStart(fromStr);
+  const toD = parseDateInputLocalEnd(toStr);
   const perStaffMonth = {}; // name -> {month: amount}
   const totalMonth = {}; // 'YYYY-MM' -> amount
   allBatches.forEach(batch=>{
