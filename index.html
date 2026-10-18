@@ -270,6 +270,19 @@
       <h2>Các đợt dữ liệu đã lưu <button class="btn secondary small" id="btnExportAllBatches" type="button" style="margin-left:8px;">⬇ Xuất tất cả các đợt (gộp 1 file)</button></h2>
       <div class="batchlist" id="batchList"><p class="muted">Chưa có đợt dữ liệu nào.</p></div>
     </div>
+
+    <div class="card" id="backupCard">
+      <h2>Sao lưu &amp; khôi phục dữ liệu</h2>
+      <div id="backupReminder" style="display:none; background:#fdecea; border:1px solid #e0a599; color:#7a2b20; padding:9px 12px; border-radius:6px; font-size:13.5px; margin-bottom:10px;"></div>
+      <p class="muted">Dữ liệu chỉ nằm trong trình duyệt của máy này. Nên bấm <b>Sao lưu toàn bộ</b> ít nhất mỗi tuần và cất file vào Google Drive/Zalo cá nhân. Khi đổi máy, đổi trình duyệt hoặc lỡ xoá dữ liệu duyệt web, chỉ cần bấm <b>Khôi phục từ file sao lưu</b> là lấy lại đủ các đợt PT-TT, thu nhập thực tế, danh mục và đơn giá.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+        <button class="btn" id="btnFullBackup" type="button">⬇ Sao lưu toàn bộ (.json)</button>
+        <button class="btn secondary" id="btnFullRestore" type="button">⬆ Khôi phục từ file sao lưu</button>
+        <button class="btn secondary" id="btnScanStorage" type="button">🔍 Quét &amp; cứu dữ liệu còn sót</button>
+        <input type="file" id="restoreFileInput" accept=".json,application/json" style="display:none;">
+      </div>
+      <div id="storageStatus" class="muted" style="font-size:13px; line-height:1.6;"></div>
+    </div>
   </section>
 
   <!-- ===================== TAB 2: CONFIG ===================== -->
@@ -1107,6 +1120,184 @@ async function sDelete(key){
   } catch(e){}
 }
 
+/* ============================================================
+   AN TOÀN DỮ LIỆU: lưu trữ bền vững, cứu dữ liệu, sao lưu/khôi phục
+   ============================================================ */
+const BACKUP_TS_KEY = 'boiduong_pttt_lastBackupAt'; // không có dấu ":" -> không lẫn vào kho dữ liệu chính
+let STORAGE_PERSISTED = null;
+
+// Xin trình duyệt đánh dấu kho dữ liệu là "bền vững" -> Chrome không tự xoá khi ổ đĩa gần đầy.
+async function requestPersistentStorage(){
+  if(HAS_ARTIFACT_STORAGE) { STORAGE_PERSISTED = true; return; }
+  try{
+    if(navigator.storage && navigator.storage.persisted){
+      STORAGE_PERSISTED = await navigator.storage.persisted();
+      if(!STORAGE_PERSISTED && navigator.storage.persist) STORAGE_PERSISTED = await navigator.storage.persist();
+    }
+  }catch(e){ STORAGE_PERSISTED = null; }
+}
+
+// Liệt kê toàn bộ khoá đang có (IndexedDB + localStorage dự phòng)
+async function sListKeys(){
+  const keys = new Set();
+  if(HAS_ARTIFACT_STORAGE){
+    try{
+      if(typeof window.storage.list==='function'){
+        const r = await window.storage.list('', true);
+        const arr = Array.isArray(r) ? r : (r && r.keys) || [];
+        arr.forEach(k=> keys.add(typeof k==='string' ? k : (k && k.key)));
+      }
+    }catch(e){}
+  } else {
+    if(HAS_IDB){ try{ (await idbListKeys()).forEach(k=>keys.add(String(k))); }catch(e){} }
+    try{
+      for(let i=0;i<localStorage.length;i++){
+        const k = localStorage.key(i);
+        if(k && k.startsWith(LS_PREFIX)) keys.add(k.slice(LS_PREFIX.length));
+      }
+    }catch(e){}
+  }
+  keys.delete(undefined); keys.delete('__storage_test__');
+  return Array.from(keys);
+}
+
+// Cứu các đợt dữ liệu còn nằm trong kho nhưng bị rơi khỏi danh sách (index) — VD do lần mở trước đọc index lỗi
+// rồi lưu đè danh sách mới. Dữ liệu từng đợt (batch:<id>, income:<id>) vẫn còn nên dựng lại danh sách được.
+async function recoverOrphanRecords(){
+  const keys = await sListKeys();
+  const knownB = new Set(BATCH_INDEX.map(b=>b.id));
+  const knownI = new Set(INCOME_INDEX.map(b=>b.id));
+  let nB=0, nI=0;
+  for(const k of keys){
+    if(k.startsWith('batch:')){
+      const id = k.slice(6);
+      if(knownB.has(id)) continue;
+      const b = await sGet(k);
+      if(!b || !Array.isArray(b.rows)) continue;
+      const role = b.enteredBy==='admin' ? 'admin' : 'user';
+      BATCH_INDEX_BY_ROLE[role].push({id, from:b.from, to:b.to, note:b.note||'', uploadedAt:b.uploadedAt||new Date().toISOString(),
+        filename:b.filename||'(đợt khôi phục)', count:b.rows.length, exemptCases:b.exemptCases||[], enteredBy:role});
+      knownB.add(id); nB++;
+    } else if(k.startsWith('income:') && k!=='income:index'){
+      const id = k.slice(7);
+      if(knownI.has(id)) continue;
+      const b = await sGet(k);
+      if(!b || !Array.isArray(b.rows)) continue;
+      INCOME_INDEX.push({id, month:b.month, filename:b.filename||'(đợt khôi phục)', note:b.note||'', uploadedAt:b.uploadedAt||new Date().toISOString(),
+        countMatched:b.rows.length, countUnmatched:0,
+        totalChuyenKhoan:b.rows.reduce((s,r)=>s+(r.chuyenKhoan||0),0), totalThucNhan:b.rows.reduce((s,r)=>s+(r.thucNhan||0),0)});
+      knownI.add(id); nI++;
+    }
+  }
+  if(nB){
+    await sSet('batches:index:user', BATCH_INDEX_BY_ROLE.user);
+    await sSet('batches:index:admin', BATCH_INDEX_BY_ROLE.admin);
+    BATCH_INDEX = BATCH_INDEX_BY_ROLE.user.concat(BATCH_INDEX_BY_ROLE.admin);
+  }
+  if(nI) await sSet('income:index', INCOME_INDEX);
+  return {nB, nI, totalKeys: keys.length};
+}
+
+function getLastBackupAt(){ try{ return localStorage.getItem(BACKUP_TS_KEY); }catch(e){ return null; } }
+
+async function renderStorageStatus(){
+  const el = document.getElementById('storageStatus');
+  if(!el) return;
+  let usageTxt = '';
+  try{
+    if(navigator.storage && navigator.storage.estimate){
+      const est = await navigator.storage.estimate();
+      usageTxt = `Dung lượng đang dùng: <b>${((est.usage||0)/1048576).toFixed(1)} MB</b> (hạn mức khoảng ${((est.quota||0)/1073741824).toFixed(1)} GB).`;
+    }
+  }catch(e){}
+  const persistTxt = STORAGE_PERSISTED===true
+    ? '✅ Đã bật <b>lưu trữ bền vững</b> — trình duyệt sẽ không tự xoá dữ liệu khi ổ đĩa đầy.'
+    : '⚠ Trình duyệt chưa cho bật <b>lưu trữ bền vững</b> (Chrome thường chỉ cho khi trang được đánh dấu trang/cài như ứng dụng). Dữ liệu vẫn lưu bình thường nhưng nên sao lưu định kỳ.';
+  const last = getLastBackupAt();
+  const lastTxt = last ? new Date(last).toLocaleString('vi-VN') : '<span style="color:var(--bad);">chưa sao lưu lần nào</span>';
+  el.innerHTML = `
+    📍 Địa chỉ đang dùng: <b>${location.origin}${location.pathname}</b> — dữ liệu chỉ thấy được khi mở đúng địa chỉ này, đúng trình duyệt và đúng hồ sơ Chrome trên máy này.<br>
+    📁 Đang có: <b>${BATCH_INDEX.length}</b> đợt PT-TT · <b>${INCOME_INDEX.length}</b> đợt thu nhập thực tế · ${CONFIG.staffMaster.length} nhân viên trong danh mục.<br>
+    ${persistTxt}<br>
+    ${usageTxt ? usageTxt+'<br>' : ''}
+    🕒 Lần sao lưu gần nhất: ${lastTxt}.`;
+  const rem = document.getElementById('backupReminder');
+  const hasData = BATCH_INDEX.length || INCOME_INDEX.length;
+  const days = last ? (Date.now()-new Date(last).getTime())/86400000 : Infinity;
+  if(hasData && days>7){
+    rem.style.display = 'block';
+    rem.innerHTML = last
+      ? `⚠ Đã <b>${Math.floor(days)} ngày</b> chưa sao lưu. Bấm "Sao lưu toàn bộ" để tránh mất dữ liệu.`
+      : '⚠ Dữ liệu hiện <b>chưa có bản sao lưu nào</b>. Bấm "Sao lưu toàn bộ" ngay để tránh mất dữ liệu.';
+  } else rem.style.display = 'none';
+}
+
+async function exportFullBackup(){
+  const keySet = new Set(await sListKeys());
+  ['config:main','batches:index:user','batches:index:admin','income:index'].forEach(k=>keySet.add(k));
+  BATCH_INDEX.forEach(b=>keySet.add('batch:'+b.id));
+  INCOME_INDEX.forEach(b=>keySet.add('income:'+b.id));
+  const entries = {};
+  for(const k of keySet){
+    const v = await sGet(k);
+    if(v!==null && v!==undefined) entries[k] = v;
+  }
+  const payload = {app:'boiduong_pttt', version:1, exportedAt:new Date().toISOString(), origin:location.origin+location.pathname,
+    counts:{batches:BATCH_INDEX.length, income:INCOME_INDEX.length}, entries};
+  const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
+  const d = new Date();
+  const stamp = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `SaoLuu_BoiDuongPTTT_${stamp}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+  try{ localStorage.setItem(BACKUP_TS_KEY, d.toISOString()); }catch(e){}
+  renderStorageStatus();
+  toast(`Đã sao lưu ${BATCH_INDEX.length} đợt PT-TT và ${INCOME_INDEX.length} đợt thu nhập. Hãy cất file .json vào Google Drive hoặc Zalo cá nhân.`, 7000);
+}
+
+async function importFullBackup(file){
+  let payload;
+  try{ payload = JSON.parse(await file.text()); }catch(e){ toast('File không đúng định dạng sao lưu (.json).'); return; }
+  if(!payload || payload.app!=='boiduong_pttt' || !payload.entries){ toast('Đây không phải file sao lưu của ứng dụng Bồi dưỡng PT-TT.'); return; }
+  const E = payload.entries;
+  const backupBatchIds = Object.keys(E).filter(k=>k.startsWith('batch:')).map(k=>k.slice(6));
+  const backupIncIds = Object.keys(E).filter(k=>k.startsWith('income:') && k!=='income:index').map(k=>k.slice(7));
+  const newB = backupBatchIds.filter(id=>!BATCH_INDEX.find(b=>b.id===id)).length;
+  const newI = backupIncIds.filter(id=>!INCOME_INDEX.find(b=>b.id===id)).length;
+  const when = payload.exportedAt ? new Date(payload.exportedAt).toLocaleString('vi-VN') : '?';
+  if(!confirm(`File sao lưu lúc ${when}\n• ${backupBatchIds.length} đợt PT-TT (${newB} đợt chưa có ở đây)\n• ${backupIncIds.length} đợt thu nhập (${newI} đợt chưa có ở đây)\n\nKhôi phục sẽ GỘP vào dữ liệu hiện có, KHÔNG xoá đợt nào đang có. Tiếp tục?`)) return;
+  let replaceCfg = false;
+  if(E['config:main']){
+    replaceCfg = confirm('Dùng luôn Cấu hình trong file sao lưu (đơn giá, danh mục nhân viên, quy tắc miễn trừ, ánh xạ cột)?\n\nOK = thay bằng bản sao lưu · Cancel = giữ cấu hình hiện tại.');
+  }
+  let fail = 0;
+  for(const k of Object.keys(E)){
+    const isRecord = k.startsWith('batch:') || (k.startsWith('income:') && k!=='income:index');
+    if(!isRecord) continue;
+    if(!(await sSet(k, E[k]))) fail++;
+  }
+  if(replaceCfg && !(await sSet('config:main', E['config:main']))) fail++;
+  if(fail){ toast(storageErrorMessage(), 10000); }
+  // Danh sách (index) sẽ được dựng lại tự động bằng recoverOrphanRecords khi tải lại trang
+  toast('Đã khôi phục — đang tải lại ứng dụng...', 3000);
+  setTimeout(()=>location.reload(), 1200);
+}
+
+function setupBackupHandlers(){
+  document.getElementById('btnFullBackup').addEventListener('click', exportFullBackup);
+  const fi = document.getElementById('restoreFileInput');
+  document.getElementById('btnFullRestore').addEventListener('click', ()=>fi.click());
+  fi.addEventListener('change', e=>{ const f=e.target.files[0]; fi.value=''; if(f) importFullBackup(f); });
+  document.getElementById('btnScanStorage').addEventListener('click', async ()=>{
+    const r = await recoverOrphanRecords();
+    renderBatchList(); renderIncomeBatchList(); renderStorageStatus();
+    if(r.nB || r.nI) toast(`🛟 Đã cứu được ${r.nB} đợt PT-TT và ${r.nI} đợt thu nhập.`, 7000);
+    else toast(`Đã quét ${r.totalKeys} mục trong kho của trình duyệt này — không còn đợt nào bị sót. Nếu dữ liệu cũ vẫn không thấy thì nó không nằm ở địa chỉ/trình duyệt này.`, 9000);
+  });
+}
+
 function toast(msg, durationMs){
   const t=document.getElementById('toast');
   t.textContent=msg; t.classList.add('show');
@@ -1144,10 +1335,22 @@ async function init(){
         ? '💾 Dữ liệu lưu trên trình duyệt này bằng IndexedDB (dung lượng lớn, không tự đồng bộ sang máy/trình duyệt khác)'
         : '💾 Dữ liệu lưu trên trình duyệt này (không tự đồng bộ sang máy/trình duyệt khác)');
   await testStorageAndWarn();
-  const cfg = await sGet('config:main');
+  await requestPersistentStorage();
+  let cfg = await sGet('config:main');
+  let cfgUnreadable = false;
+  if(!cfg){
+    // Có khoá config:main mà đọc ra rỗng -> thử mở lại kết nối 1 lần; nếu vẫn lỗi thì KHÔNG ghi đè bằng cấu hình mặc định
+    const keys0 = await sListKeys();
+    if(keys0.includes('config:main')){
+      idbConnPromise = null;
+      cfg = await sGet('config:main');
+      if(!cfg) cfgUnreadable = true;
+    }
+  }
   if(cfg) CONFIG = Object.assign(CONFIG, cfg);
   migrateStaffConfig();
-  await sSet('config:main', CONFIG);
+  if(!cfgUnreadable) await sSet('config:main', CONFIG);
+  else toast('⚠ Không đọc được cấu hình đã lưu — app tạm dùng cấu hình mặc định và KHÔNG ghi đè. Hãy tải lại trang.', 9000);
   const idxUser = await sGet('batches:index:user');
   const idxAdmin = await sGet('batches:index:admin');
   if(idxUser || idxAdmin){
@@ -1168,6 +1371,10 @@ async function init(){
   BATCH_INDEX = BATCH_INDEX_BY_ROLE.user.concat(BATCH_INDEX_BY_ROLE.admin);
   const incIdx = await sGet('income:index');
   if(incIdx) INCOME_INDEX = incIdx;
+  const rec = await recoverOrphanRecords();
+  if(rec.nB || rec.nI) toast(`🛟 Đã tự khôi phục ${rec.nB} đợt PT-TT và ${rec.nI} đợt thu nhập bị mất khỏi danh sách (dữ liệu gốc vẫn còn trong trình duyệt).`, 9000);
+  setupBackupHandlers();
+  renderStorageStatus();
   renderRateTable();
   renderExemptTable();
   renderStaffMasterTable();
@@ -1710,6 +1917,7 @@ async function exportAllBatches(){
 }
 
 function renderBatchList(){
+  renderStorageStatus();
   const el = document.getElementById('batchList');
   if(!BATCH_INDEX.length){ el.innerHTML='<p class="muted">Chưa có đợt dữ liệu nào.</p>'; return; }
   el.innerHTML='';
