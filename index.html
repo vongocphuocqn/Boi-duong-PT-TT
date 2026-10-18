@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <title>Ứng dụng tính bồi dưỡng Phẫu thuật – Thủ thuật (NĐ 192/2026)</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js"></script>
 <style>
   :root{
     --navy:#12263a;
@@ -282,6 +286,21 @@
         <input type="file" id="restoreFileInput" accept=".json,application/json" style="display:none;">
       </div>
       <div id="storageStatus" class="muted" style="font-size:13px; line-height:1.6;"></div>
+
+      <h3 style="margin-top:16px;">☁ Đồng bộ giữa máy tính – điện thoại – các máy khác</h3>
+      <div id="syncStatus" style="padding:9px 12px; border-radius:6px; font-size:13.5px; margin-bottom:10px; background:var(--paper2); border:1px solid var(--line);"></div>
+      <div id="syncSetup">
+        <p class="muted">Nhập <b>Mã đồng bộ của Khoa</b> (anh tự đặt, tối thiểu 8 ký tự, VD: <i>GMHS-GiaLai-2026!</i>). Mọi máy nhập <b>cùng một mã</b> sẽ thấy chung dữ liệu. Dữ liệu được <b>mã hoá ngay trên máy bằng mã này</b> trước khi gửi lên máy chủ — không có mã thì không ai đọc được, kể cả người quản trị máy chủ. <b>Ghi nhớ mã cẩn thận</b>: quên mã thì không lấy lại được dữ liệu trên máy chủ (dữ liệu trên máy này vẫn còn).</p>
+        <div class="row" style="align-items:end;">
+          <div class="col" style="max-width:320px;"><label>Mã đồng bộ</label><input type="password" id="syncPassInput" placeholder="Mã đồng bộ của Khoa" autocomplete="off"></div>
+          <div class="col" style="max-width:320px;"><label>Nhập lại mã</label><input type="password" id="syncPassInput2" placeholder="Nhập lại cho chắc" autocomplete="off"></div>
+          <div class="col" style="flex:0;"><button class="btn" id="btnSyncEnable" type="button">☁ Bật đồng bộ trên máy này</button></div>
+        </div>
+      </div>
+      <div id="syncActive" style="display:none; gap:10px; flex-wrap:wrap;">
+        <button class="btn secondary" id="btnSyncNow" type="button">⟳ Đồng bộ ngay</button>
+        <button class="btn secondary" id="btnSyncDisable" type="button">Tắt đồng bộ trên máy này</button>
+      </div>
     </div>
   </section>
 
@@ -1094,7 +1113,7 @@ async function sGet(key){
     return raw ? JSON.parse(raw) : null;
   } catch(e){ LAST_STORAGE_ERROR = (e && e.name ? e.name+': ' : '')+(e && e.message ? e.message : String(e)); return null; }
 }
-async function sSet(key,val){
+async function sSetLocal(key,val){
   try{
     if(HAS_ARTIFACT_STORAGE){
       await window.storage.set(key, JSON.stringify(val), true);
@@ -1112,12 +1131,338 @@ async function sSet(key,val){
     return false;
   }
 }
-async function sDelete(key){
+async function sDeleteLocal(key){
   try{
     if(HAS_ARTIFACT_STORAGE){ await window.storage.delete(key,true); return; }
-    if(HAS_IDB){ await idbDelete(key); return; }
-    localStorage.removeItem(LS_PREFIX+key);
+    if(HAS_IDB){ await idbDelete(key); }
+    try{ localStorage.removeItem(LS_PREFIX+key); }catch(e){} // xoá luôn bản cũ trong localStorage (nếu có) để không "sống lại"
   } catch(e){}
+}
+// Ghi/xoá do NGƯỜI DÙNG thao tác: lưu vào máy này + ghi mốc thời gian + đẩy lên đồng bộ (nếu đã bật)
+async function sSet(key,val){
+  const ok = await sSetLocal(key,val);
+  if(ok && syncTracked(key)) syncNoteLocalChange(key, val, false);
+  return ok;
+}
+async function sDelete(key){
+  await sDeleteLocal(key);
+  if(syncTracked(key)) syncNoteLocalChange(key, null, true);
+}
+
+/* ============================================================
+   ĐỒNG BỘ NHIỀU THIẾT BỊ (Firebase Realtime Database — dùng chung project với app Kanban của Khoa)
+   - Mỗi khoá dữ liệu (config:main, batches:index:*, batch:<id>, income:*) được MÃ HOÁ AES-256-GCM ngay trên máy
+     bằng khoá sinh từ "Mã đồng bộ" (PBKDF2 200.000 vòng) rồi mới gửi lên. Máy chủ chỉ giữ chuỗi đã mã hoá.
+   - Đường dẫn: bdpttt/<room>/meta/<khoá> = mốc thời gian (số âm = đã xoá), bdpttt/<room>/kv/<khoá> = gói mã hoá.
+     <room> cũng sinh từ Mã đồng bộ (PBKDF2) -> không đoán được từ bên ngoài.
+   - Bản sao trên máy (IndexedDB) vẫn giữ nguyên làm bộ nhớ đệm: mất mạng vẫn dùng được, có mạng lại tự đẩy lên.
+   - Xung đột: khoá nào có mốc thời gian mới hơn thì thắng. Các đợt (batch:/income:) có id riêng nên không đè nhau;
+     danh sách đợt bị lệch sẽ được recoverOrphanRecords() tự dựng lại.
+   ============================================================ */
+const FB_CONFIG = {
+  apiKey: "AIzaSyCYlt9_KavJx0wHAYzS0BZ5oQ9Fx_1bCPs",
+  authDomain: "kanban-gmhs-gialai.firebaseapp.com",
+  databaseURL: "https://kanban-gmhs-gialai-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "kanban-gmhs-gialai",
+  storageBucket: "kanban-gmhs-gialai.firebasestorage.app",
+  messagingSenderId: "263121492012",
+  appId: "1:263121492012:web:6f14480e46476eb8125989"
+};
+const FB_APP_CHECK_SITE_KEY = '6Lf3__QtAAAAAD__BtrbmDoYkPzZuhpdKsBbQe_g';
+const SYNC_PASS_KEY = 'boiduong_pttt_syncPass';   // lưu trên máy này (localStorage), không gửi đi đâu
+const SYNC_DEVICE_KEY = 'boiduong_pttt_deviceId';
+const SYNC_META_KEY = '__syncmeta__';             // mốc thời gian từng khoá trên máy này (không đồng bộ)
+const SYNC_SALT = 'bdpttt-gmhs-gialai-v1';
+let SYNC = {enabled:false, ready:false, busy:false, key:null, room:null, db:null, base:null, err:null, lastSync:null, deviceId:null, pushing:0};
+let SYNC_META = {};
+let syncMetaSaveTimer = null, syncReloadTimer = null;
+
+function syncTracked(key){ return !!key && key!=='__storage_test__' && key!==SYNC_META_KEY; }
+function fbKeyEnc(k){ return String(k).replace(/[.#$\[\]\/%]/g, c=>'%'+c.charCodeAt(0).toString(16).toUpperCase().padStart(2,'0')); }
+function fbKeyDec(k){ try{ return decodeURIComponent(k); }catch(e){ return k; } }
+function b64e(buf){ const a=new Uint8Array(buf); let s=''; for(let i=0;i<a.length;i+=0x8000) s+=String.fromCharCode.apply(null,a.subarray(i,i+0x8000)); return btoa(s); }
+function b64d(str){ const s=atob(str); const a=new Uint8Array(s.length); for(let i=0;i<s.length;i++) a[i]=s.charCodeAt(i); return a; }
+async function gzipBytes(u8){
+  if(typeof CompressionStream==='undefined') return null;
+  try{ const st=new Blob([u8]).stream().pipeThrough(new CompressionStream('gzip')); return new Uint8Array(await new Response(st).arrayBuffer()); }catch(e){ return null; }
+}
+async function gunzipBytes(u8){
+  const st=new Blob([u8]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Uint8Array(await new Response(st).arrayBuffer());
+}
+async function deriveSyncSecrets(pass){
+  const enc = new TextEncoder();
+  const base = await crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveKey','deriveBits']);
+  const key = await crypto.subtle.deriveKey({name:'PBKDF2', salt:enc.encode(SYNC_SALT+'|key'), iterations:200000, hash:'SHA-256'},
+    base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+  const bits = await crypto.subtle.deriveBits({name:'PBKDF2', salt:enc.encode(SYNC_SALT+'|room'), iterations:200000, hash:'SHA-256'}, base, 128);
+  const room = Array.from(new Uint8Array(bits)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  return {key, room};
+}
+async function syncEncrypt(val, t){
+  let data = new TextEncoder().encode(JSON.stringify(val)); let z = 0;
+  const g = await gzipBytes(data);
+  if(g && g.length < data.length){ data = g; z = 1; }
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, SYNC.key, data);
+  return {t, z, iv:b64e(iv), d:b64e(ct), by:SYNC.deviceId};
+}
+async function syncDecrypt(env){
+  const pt = new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d(env.iv)}, SYNC.key, b64d(env.d)));
+  const raw = env.z ? await gunzipBytes(pt) : pt;
+  return JSON.parse(new TextDecoder().decode(raw));
+}
+function syncSaveMetaSoon(){
+  clearTimeout(syncMetaSaveTimer);
+  syncMetaSaveTimer = setTimeout(()=>{ sSetLocal(SYNC_META_KEY, SYNC_META); }, 400);
+}
+function syncNewTs(){ // mốc thời gian luôn tăng, không trùng nhau trên cùng 1 máy
+  let t = Date.now();
+  if(t <= (SYNC.lastTs||0)) t = SYNC.lastTs + 1;
+  SYNC.lastTs = t; return t;
+}
+
+// Gọi mỗi khi người dùng lưu/xoá 1 khoá trên máy này
+function syncNoteLocalChange(key, val, isDelete){
+  const t = syncNewTs();
+  SYNC_META[key] = isDelete ? -t : t;
+  syncSaveMetaSoon();
+  if(SYNC.enabled && SYNC.ready) syncPushKey(key, isDelete ? null : val, SYNC_META[key]);
+}
+async function syncPushKey(key, val, signedT){
+  const k = fbKeyEnc(key);
+  SYNC.pushing++; renderSyncStatus();
+  try{
+    const upd = {};
+    upd['meta/'+k] = signedT;
+    upd['kv/'+k] = (signedT<0 || val===null || val===undefined) ? null : await syncEncrypt(val, signedT);
+    await SYNC.base.update(upd);
+    SYNC.lastSync = new Date(); SYNC.err = null;
+  }catch(e){ SYNC.err = e; console.error('[Đồng bộ] đẩy lên lỗi', key, e); }
+  finally{ SYNC.pushing--; renderSyncStatus(); }
+}
+
+// Áp 1 khoá từ máy chủ xuống máy này nếu bản trên máy chủ mới hơn
+async function syncApplyRemote(key, remoteSignedT){
+  const localT = Math.abs(SYNC_META[key]||0), remoteT = Math.abs(remoteSignedT||0);
+  if(remoteT <= localT) return false;
+  if(remoteSignedT < 0){
+    await sDeleteLocal(key);
+  } else {
+    const snap = await SYNC.base.child('kv/'+fbKeyEnc(key)).once('value');
+    const env = snap.val();
+    if(!env) return false; // gói dữ liệu chưa tới (đang ghi) -> lần sau sẽ lấy
+    let val;
+    try{ val = await syncDecrypt(env); }
+    catch(e){ SYNC.err = {code:'decrypt'}; renderSyncStatus(); return false; }
+    await sSetLocal(key, val);
+  }
+  SYNC_META[key] = remoteSignedT;
+  syncSaveMetaSoon();
+  return true;
+}
+
+function firebaseReady(){ return typeof firebase!=='undefined' && firebase.initializeApp && firebase.database && firebase.auth; }
+let FB_INIT_PROMISE = null;
+function initFirebaseOnce(){
+  if(FB_INIT_PROMISE) return FB_INIT_PROMISE;
+  FB_INIT_PROMISE = (async ()=>{
+    if(!firebaseReady()) throw {code:'no-sdk'};
+    const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(FB_CONFIG);
+    try{
+      if(typeof firebase.appCheck==='function'){
+        const prov = firebase.appCheck.ReCaptchaEnterpriseProvider ? new firebase.appCheck.ReCaptchaEnterpriseProvider(FB_APP_CHECK_SITE_KEY) : FB_APP_CHECK_SITE_KEY;
+        firebase.appCheck().activate(prov, true);
+      }
+    }catch(e){ console.warn('[Đồng bộ] App Check chưa bật được', e); }
+    const auth = firebase.auth();
+    if(!auth.currentUser){
+      await new Promise((resolve,reject)=>{
+        const timer = setTimeout(()=>reject({code:'auth-timeout'}), 15000);
+        const unsub = auth.onAuthStateChanged(u=>{
+          if(u){ clearTimeout(timer); unsub(); resolve(u); }
+          else auth.signInAnonymously().catch(e=>{ clearTimeout(timer); unsub(); reject(e); });
+        }, e=>{ clearTimeout(timer); reject(e); });
+      });
+    }
+    return app.database();
+  })();
+  FB_INIT_PROMISE.catch(()=>{ FB_INIT_PROMISE = null; });
+  return FB_INIT_PROMISE;
+}
+
+// Đồng bộ toàn phần: so mốc thời gian từng khoá, kéo bản mới hơn về, đẩy bản mới hơn lên
+async function syncFull(){
+  if(!SYNC.enabled || SYNC.busy) return;
+  SYNC.busy = true; renderSyncStatus();
+  try{
+    SYNC.db = await initFirebaseOnce();
+    SYNC.base = SYNC.db.ref('bdpttt/'+SYNC.room);
+    const remoteMeta = (await SYNC.base.child('meta').once('value')).val() || {};
+    const remote = {};
+    Object.keys(remoteMeta).forEach(k=> remote[fbKeyDec(k)] = remoteMeta[k]);
+    let pulled = 0, pushed = 0;
+    for(const key of Object.keys(remote)){
+      if(!syncTracked(key)) continue;
+      if(await syncApplyRemote(key, remote[key])) pulled++;
+    }
+    const localKeys = (await sListKeys()).filter(syncTracked);
+    const toPush = new Set(localKeys);
+    Object.keys(SYNC_META).forEach(k=>{ if(SYNC_META[k]<0) toPush.add(k); }); // các khoá đã xoá trên máy này
+    for(const key of toPush){
+      const lt = SYNC_META[key]||0, rt = remote[key];
+      const remoteAbs = Math.abs(rt||0);
+      if(rt!==undefined && Math.abs(lt) <= remoteAbs) continue; // máy chủ bằng hoặc mới hơn
+      if(lt<0){ if(rt!==undefined && rt<0) continue; await syncPushKey(key, null, lt); pushed++; continue; }
+      const val = await sGet(key);
+      if(val===null || val===undefined) continue;
+      let t = lt;
+      if(!t){ t = syncNewTs(); SYNC_META[key] = t; } // dữ liệu có từ trước khi bật đồng bộ
+      if(!remote[key] || key.startsWith('batch:') || key.startsWith('income:') || t > remoteAbs){
+        await syncPushKey(key, val, t); pushed++;
+      }
+    }
+    syncSaveMetaSoon();
+    SYNC.ready = true; SYNC.err = null; SYNC.lastSync = new Date();
+    if(pulled) await reloadStateFromLocal();
+    if(!SYNC.listening) syncListen();
+    if(pulled || pushed) toast(`☁ Đã đồng bộ: nhận ${pulled} mục, gửi ${pushed} mục.`, 4500);
+  }catch(e){
+    SYNC.err = e; console.error('[Đồng bộ] lỗi', e);
+  }finally{
+    SYNC.busy = false; renderSyncStatus();
+  }
+}
+
+// Lắng nghe thay đổi từ máy khác theo thời gian thực
+function syncListen(){
+  if(!SYNC.base) return;
+  const metaRef = SYNC.base.child('meta');
+  const handler = async (snap)=>{
+    const key = fbKeyDec(snap.key);
+    if(!syncTracked(key)) return;
+    if(await syncApplyRemote(key, snap.val())){
+      SYNC.lastSync = new Date(); renderSyncStatus();
+      clearTimeout(syncReloadTimer);
+      syncReloadTimer = setTimeout(async ()=>{
+        await reloadStateFromLocal();
+        toast('☁ Có dữ liệu mới từ máy khác — đã cập nhật.', 3500);
+      }, 700);
+    }
+  };
+  metaRef.on('child_added', handler, e=>{ SYNC.err=e; renderSyncStatus(); });
+  metaRef.on('child_changed', handler);
+  SYNC.listening = true;
+  SYNC.metaRef = metaRef;
+  try{
+    SYNC.db.ref('.info/connected').on('value', s=>{ SYNC.online = !!s.val(); renderSyncStatus(); if(SYNC.online && SYNC.ready && !SYNC.busy) syncFull(); });
+  }catch(e){}
+}
+
+// Đọc lại toàn bộ trạng thái từ bản trên máy (sau khi nhận dữ liệu đồng bộ về) và vẽ lại giao diện
+async function reloadStateFromLocal(){
+  const cfg = await sGet('config:main');
+  if(cfg){ CONFIG = Object.assign(CONFIG, cfg); migrateStaffConfig(); }
+  BATCH_INDEX_BY_ROLE.user = (await sGet('batches:index:user')) || [];
+  BATCH_INDEX_BY_ROLE.admin = (await sGet('batches:index:admin')) || [];
+  INCOME_INDEX = (await sGet('income:index')) || [];
+  const keys = new Set(await sListKeys());
+  // Ẩn tạm những đợt đã bị xoá ở máy khác (chỉ lọc trong bộ nhớ, không ghi đè danh sách)
+  BATCH_INDEX_BY_ROLE.user = BATCH_INDEX_BY_ROLE.user.filter(b=>keys.has('batch:'+b.id));
+  BATCH_INDEX_BY_ROLE.admin = BATCH_INDEX_BY_ROLE.admin.filter(b=>keys.has('batch:'+b.id));
+  INCOME_INDEX = INCOME_INDEX.filter(b=>keys.has('income:'+b.id));
+  BATCH_INDEX = BATCH_INDEX_BY_ROLE.user.concat(BATCH_INDEX_BY_ROLE.admin);
+  await recoverOrphanRecords();
+  try{
+    renderRateTable(); renderExemptTable(); renderStaffMasterTable();
+    renderBatchList(); renderIncomeBatchList();
+    document.getElementById('incomeDeductPctLabel').textContent = CONFIG.deductPct;
+    const activeTab = document.querySelector('nav.tabs button.active');
+    SUMMARY_NEEDS_RECOMPUTE = true;
+    if(activeTab && activeTab.dataset.tab==='summary') maybeAutoRecomputeSummary();
+    if(activeTab && activeTab.dataset.tab==='summary') renderGtPickLists();
+  }catch(e){ console.error(e); }
+}
+
+function syncErrorText(e){
+  const code = (e && (e.code||e.message)) || String(e||'');
+  if(/no-sdk/.test(code)) return 'Chưa tải được thư viện Firebase (kiểm tra mạng). App vẫn dùng bình thường trên máy này, có mạng sẽ tự đồng bộ lại.';
+  if(/PERMISSION_DENIED|permission/i.test(code)) return 'Máy chủ từ chối quyền ghi/đọc (PERMISSION_DENIED). Cần thêm quy tắc cho nhánh "bdpttt" trong Firebase Console → Realtime Database → Rules (xem hướng dẫn em gửi).';
+  if(/admin-restricted|operation-not-allowed/i.test(code)) return 'Firebase chưa bật đăng nhập ẩn danh (Authentication → Sign-in method → Anonymous).';
+  if(/auth-timeout|network/i.test(code)) return 'Không kết nối được máy chủ (mất mạng hoặc mạng chậm). Dữ liệu vẫn lưu trên máy này, có mạng sẽ tự đồng bộ.';
+  if(/app-check|appCheck/i.test(code)) return 'App Check từ chối yêu cầu — kiểm tra trang đã được đăng ký trong App Check của Firebase.';
+  if(/decrypt/.test(code)) return 'Không giải mã được dữ liệu trên máy chủ — Mã đồng bộ trên máy này KHÁC với máy đã gửi dữ liệu. Tắt đồng bộ rồi nhập lại đúng mã.';
+  return 'Lỗi đồng bộ: '+code;
+}
+
+function renderSyncStatus(){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  const setup = document.getElementById('syncSetup'), active = document.getElementById('syncActive');
+  if(HAS_ARTIFACT_STORAGE){
+    el.innerHTML = 'Đang chạy trong Claude — dữ liệu đã dùng chung qua kho của Claude, không cần đồng bộ thêm.';
+    setup.style.display='none'; active.style.display='none'; return;
+  }
+  setup.style.display = SYNC.enabled ? 'none' : '';
+  active.style.display = SYNC.enabled ? 'flex' : 'none';
+  if(!SYNC.enabled){
+    el.style.background='var(--paper2)'; el.style.borderColor='var(--line)'; el.style.color='';
+    el.innerHTML = '⚪ <b>Chưa bật đồng bộ</b> — dữ liệu chỉ nằm trên máy này. Bật đồng bộ để máy tính, điện thoại và các máy khác dùng chung số liệu.';
+    return;
+  }
+  if(SYNC.err){
+    el.style.background='#fdecea'; el.style.borderColor='#e0a599'; el.style.color='#7a2b20';
+    el.innerHTML = '⚠ '+syncErrorText(SYNC.err);
+    return;
+  }
+  el.style.background='#eef3ee'; el.style.borderColor='#9fc3a9'; el.style.color='#1f4d36';
+  const when = SYNC.lastSync ? SYNC.lastSync.toLocaleTimeString('vi-VN') : '—';
+  const state = SYNC.busy ? '⟳ Đang đồng bộ...' : (SYNC.pushing ? '⟳ Đang gửi lên...' : (SYNC.online===false ? '📴 Mất kết nối — sẽ tự đồng bộ khi có mạng' : '✅ Đã đồng bộ'));
+  el.innerHTML = `☁ <b>Đồng bộ đang bật</b> trên máy này · ${state} · lần gần nhất: ${when}. Mọi máy dùng cùng Mã đồng bộ sẽ tự cập nhật theo thời gian thực.`;
+}
+
+async function enableSyncWithPass(pass, isStartup){
+  try{
+    const s = await deriveSyncSecrets(pass);
+    SYNC.key = s.key; SYNC.room = s.room; SYNC.enabled = true; SYNC.err = null;
+    if(!isStartup){ try{ localStorage.setItem(SYNC_PASS_KEY, pass); }catch(e){} }
+    renderSyncStatus();
+    await syncFull();
+  }catch(e){ SYNC.err = e; renderSyncStatus(); }
+}
+
+async function startSyncIfConfigured(){
+  try{ SYNC.deviceId = localStorage.getItem(SYNC_DEVICE_KEY); }catch(e){}
+  if(!SYNC.deviceId){ SYNC.deviceId = 'd_'+Math.random().toString(36).slice(2,10); try{ localStorage.setItem(SYNC_DEVICE_KEY, SYNC.deviceId); }catch(e){} }
+  SYNC_META = (await sGet(SYNC_META_KEY)) || {};
+  Object.values(SYNC_META).forEach(v=>{ const a=Math.abs(v||0); if(a>(SYNC.lastTs||0)) SYNC.lastTs = a; });
+  setupSyncHandlers();
+  renderSyncStatus();
+  if(HAS_ARTIFACT_STORAGE) return;
+  let pass = null; try{ pass = localStorage.getItem(SYNC_PASS_KEY); }catch(e){}
+  if(pass) enableSyncWithPass(pass, true); // không chặn giao diện
+}
+
+function setupSyncHandlers(){
+  document.getElementById('btnSyncEnable').addEventListener('click', async ()=>{
+    const p1 = document.getElementById('syncPassInput').value;
+    const p2 = document.getElementById('syncPassInput2').value;
+    if(p1.length < 8){ toast('Mã đồng bộ cần tối thiểu 8 ký tự.'); return; }
+    if(p1 !== p2){ toast('Hai lần nhập mã không khớp.'); return; }
+    if(!confirm('Bật đồng bộ với mã này?\n\n• Nếu máy chủ CHƯA có dữ liệu với mã này: dữ liệu trên máy này sẽ được gửi lên.\n• Nếu máy chủ ĐÃ có dữ liệu: các đợt trên máy chủ sẽ được tải về và GỘP với các đợt trên máy này (không xoá đợt nào). Cấu hình (đơn giá, danh mục) lấy theo bản chỉnh sửa mới nhất.\n\nNhớ ghi lại Mã đồng bộ để nhập trên các máy khác.')) return;
+    document.getElementById('syncPassInput').value=''; document.getElementById('syncPassInput2').value='';
+    await enableSyncWithPass(p1, false);
+    if(!SYNC.err) toast('☁ Đã bật đồng bộ trên máy này.', 4000);
+  });
+  document.getElementById('btnSyncNow').addEventListener('click', ()=>{ SYNC.err=null; syncFull(); });
+  document.getElementById('btnSyncDisable').addEventListener('click', ()=>{
+    if(!confirm('Tắt đồng bộ trên máy này?\n\nDữ liệu trên máy này và trên máy chủ vẫn giữ nguyên; chỉ là máy này thôi nhận/gửi cập nhật. Muốn bật lại phải nhập lại Mã đồng bộ.')) return;
+    try{ localStorage.removeItem(SYNC_PASS_KEY); }catch(e){}
+    try{ if(SYNC.metaRef){ SYNC.metaRef.off(); } }catch(e){}
+    SYNC = Object.assign(SYNC, {enabled:false, ready:false, key:null, room:null, base:null, err:null, listening:false, metaRef:null});
+    renderSyncStatus();
+    toast('Đã tắt đồng bộ trên máy này.');
+  });
 }
 
 /* ============================================================
@@ -1233,7 +1578,7 @@ async function renderStorageStatus(){
 }
 
 async function exportFullBackup(){
-  const keySet = new Set(await sListKeys());
+  const keySet = new Set((await sListKeys()).filter(k=>k!==SYNC_META_KEY));
   ['config:main','batches:index:user','batches:index:admin','income:index'].forEach(k=>keySet.add(k));
   BATCH_INDEX.forEach(b=>keySet.add('batch:'+b.id));
   INCOME_INDEX.forEach(b=>keySet.add('income:'+b.id));
@@ -1349,7 +1694,7 @@ async function init(){
   }
   if(cfg) CONFIG = Object.assign(CONFIG, cfg);
   migrateStaffConfig();
-  if(!cfgUnreadable) await sSet('config:main', CONFIG);
+  if(!cfgUnreadable) await sSetLocal('config:main', CONFIG); // ghi cục bộ, KHÔNG coi là chỉnh sửa mới (tránh máy mới đè cấu hình đã đồng bộ)
   else toast('⚠ Không đọc được cấu hình đã lưu — app tạm dùng cấu hình mặc định và KHÔNG ghi đè. Hãy tải lại trang.', 9000);
   const idxUser = await sGet('batches:index:user');
   const idxAdmin = await sGet('batches:index:admin');
@@ -1374,6 +1719,7 @@ async function init(){
   const rec = await recoverOrphanRecords();
   if(rec.nB || rec.nI) toast(`🛟 Đã tự khôi phục ${rec.nB} đợt PT-TT và ${rec.nI} đợt thu nhập bị mất khỏi danh sách (dữ liệu gốc vẫn còn trong trình duyệt).`, 9000);
   setupBackupHandlers();
+  await startSyncIfConfigured();
   renderStorageStatus();
   renderRateTable();
   renderExemptTable();
