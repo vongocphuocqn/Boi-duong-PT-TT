@@ -296,6 +296,8 @@
           <div class="col" style="max-width:320px;"><label>Nhập lại mã</label><input type="password" id="syncPassInput2" placeholder="Nhập lại cho chắc" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
           <div class="col" style="flex:0;"><button class="btn" id="btnSyncEnable" type="button">☁ Bật đồng bộ trên máy này</button></div>
         </div>
+        <label style="display:inline-flex; align-items:center; gap:6px; width:auto; margin-top:8px;"><input type="checkbox" id="syncShowPass" style="width:auto;"> 👁 Hiện mã đang gõ</label>
+        <p class="muted" style="margin-top:6px;">Mã <b>không phân biệt chữ hoa/thường, có dấu hay không dấu, có dấu cách hay không</b> — VD "GMHS Gia Lai 2026", "gmhsgialai2026" là cùng một mã. Trước khi gõ, hãy <b>xoá sạch ô</b> (trình duyệt có thể tự điền sẵn mật khẩu cũ).</p>
       </div>
       <div id="syncActive" style="display:none; gap:10px; flex-wrap:wrap;">
         <button class="btn secondary" id="btnSyncNow" type="button">⟳ Đồng bộ ngay</button>
@@ -1190,7 +1192,14 @@ async function gunzipBytes(u8){
   const st=new Blob([u8]).stream().pipeThrough(new DecompressionStream('gzip'));
   return new Uint8Array(await new Response(st).arrayBuffer());
 }
+// Chuẩn hoá mã: không phân biệt hoa/thường, bỏ dấu tiếng Việt, bỏ khoảng trắng -> gõ trên máy tính hay iPhone/Android
+// (bộ gõ Telex, tự viết hoa chữ đầu, tự thêm dấu cách...) đều ra cùng một mã.
+function normalizeSyncPass(p){
+  return String(p||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D')
+    .toLowerCase().replace(/\s+/g,'');
+}
 async function deriveSyncSecrets(pass){
+  pass = normalizeSyncPass(pass);
   const enc = new TextEncoder();
   const base = await crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveKey','deriveBits']);
   const key = await crypto.subtle.deriveKey({name:'PBKDF2', salt:enc.encode(SYNC_SALT+'|key'), iterations:200000, hash:'SHA-256'},
@@ -1451,13 +1460,19 @@ function setupSyncHandlers(){
   document.getElementById('btnSyncEnable').addEventListener('click', async ()=>{
     const p1 = document.getElementById('syncPassInput').value.trim();
     const p2 = document.getElementById('syncPassInput2').value.trim();
-    if(p1.length < 8){ toast('Mã đồng bộ cần tối thiểu 8 ký tự.'); return; }
-    if(p1 !== p2){ toast('Hai lần nhập mã không khớp.'); return; }
+    if(normalizeSyncPass(p1).length < 8){ toast('Mã đồng bộ cần tối thiểu 8 ký tự (không tính dấu cách).'); return; }
+    if(normalizeSyncPass(p1) !== normalizeSyncPass(p2)){ toast('Hai lần nhập mã không khớp.'); return; }
     if(!confirm('Bật đồng bộ với mã này?\n\n• Nếu máy chủ CHƯA có dữ liệu với mã này: dữ liệu trên máy này sẽ được gửi lên.\n• Nếu máy chủ ĐÃ có dữ liệu: các đợt trên máy chủ sẽ được tải về và GỘP với các đợt trên máy này (không xoá đợt nào). Cấu hình (đơn giá, danh mục) lấy theo bản chỉnh sửa mới nhất.\n\nNhớ ghi lại Mã đồng bộ để nhập trên các máy khác.')) return;
     document.getElementById('syncPassInput').value=''; document.getElementById('syncPassInput2').value='';
     await enableSyncWithPass(p1, false);
     if(!SYNC.err) toast('☁ Đã bật đồng bộ trên máy này.', 4000);
   });
+  document.getElementById('syncShowPass').addEventListener('change', e=>{
+    ['syncPassInput','syncPassInput2'].forEach(id=> document.getElementById(id).type = e.target.checked ? 'text' : 'password');
+  });
+  // Xoá giá trị trình duyệt tự điền sẵn (autofill) để tránh gõ nối thêm vào mật khẩu cũ
+  setTimeout(()=>{ ['syncPassInput','syncPassInput2'].forEach(id=>{ const el=document.getElementById(id); if(el && !el.dataset.touched) el.value=''; }); }, 800);
+  ['syncPassInput','syncPassInput2'].forEach(id=> document.getElementById(id).addEventListener('input', e=> e.target.dataset.touched='1'));
   document.getElementById('btnSyncNow').addEventListener('click', ()=>{ SYNC.err=null; syncFull(); });
   document.getElementById('btnSyncDisable').addEventListener('click', ()=>{
     if(!confirm('Tắt đồng bộ trên máy này?\n\nDữ liệu trên máy này và trên máy chủ vẫn giữ nguyên; chỉ là máy này thôi nhận/gửi cập nhật. Muốn bật lại phải nhập lại Mã đồng bộ.')) return;
