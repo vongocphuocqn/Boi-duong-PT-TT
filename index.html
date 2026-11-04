@@ -898,7 +898,7 @@ table.tr-t input[type=number]{width:120px; text-align:right;}
   <!-- ===================== TAB 6: TRÍCH TIỀN PT (bổ sung) ===================== -->
   <section class="tab" id="tab-trich">
   <div class="tr-root" id="trRoot">
-  <div class="tr-bar"><div class="t">Trích 6% cá nhân · phân bổ bộ phận hỗ trợ gián tiếp · chia tiền phẫu thuật mắt cho bác sĩ GMHS (BS 6 : nộp lại 4) · <b style="font-style:normal;color:var(--tr-accent)">Bản 04/11/2026 – v30</b></div>
+  <div class="tr-bar"><div class="t">Trích 6% cá nhân · phân bổ bộ phận hỗ trợ gián tiếp · chia tiền phẫu thuật mắt cho bác sĩ GMHS (BS 6 : nộp lại 4) · <b style="font-style:normal;color:var(--tr-accent)">Bản 04/11/2026 – v31</b></div>
     <div class="tr-month"><label for="trMonth">Kỳ tính</label><input type="text" id="trMonth" placeholder="Tháng 8/2026"><button class="tr-btn sec" id="trClose" type="button" title="Đóng thẻ 6 và quay về thẻ 1. Nhập dữ liệu">✕ Đóng · về trang chủ</button></div></div>
 
   <nav class="tr-tabs" role="tablist">
@@ -979,7 +979,7 @@ table.tr-t input[type=number]{width:120px; text-align:right;}
         <h3>ĐD hành chính phòng mổ = bình quân nhóm Cọc 3 GM</h3>
         <div class="tr-field"><label for="trHCPM">Người nhận</label><input type="text" id="trHCPM" list="trNames" placeholder="Họ tên"></div>
         <div class="tr-grp" id="trGrp3" data-key="coc3" data-role="GM" data-title="Thành viên nhóm Cọc 3 (gây mê)"></div>
-        <h3>ĐD hành chính khoa = tỷ lệ × HC phòng mổ</h3>
+        <h3>ĐD hành chính hồi sức = tỷ lệ × HC phòng mổ</h3>
         <div class="tr-row">
           <div class="tr-field"><label for="trHCK">Người nhận</label><input type="text" id="trHCK" list="trNames" placeholder="Họ tên"></div>
           <div class="tr-field"><label for="trHCKr">Tỷ lệ</label><input type="number" id="trHCKr" step="0.05" min="0" style="width:90px"></div>
@@ -4825,7 +4825,7 @@ function renderTrich(T,P,E){
   const rows=[
     ['Điều dưỡng trưởng', CFG.ddt, P.ddt, `Bình quân ${lbl} của ${P.c1.length} người Cọc 1 DC`],
     ['ĐD hành chính phòng mổ', CFG.hcpm, P.hcpm, `Bình quân ${lbl} của ${P.c3.length} người Cọc 3 GM`],
-    ['ĐD hành chính khoa', CFG.hck, P.hck, `${String(CFG.hckRatio).replace('.',',')} × HC phòng mổ`],
+    ['ĐD hành chính hồi sức', CFG.hck, P.hck, `${String(CFG.hckRatio).replace('.',',')} × HC phòng mổ`],
     ...(P.hl.length? P.hl.map((h,k)=>[k? '' : `Hộ lý (${P.hl.length} người)`, h.name, +h.amt||0, 'Mức khai báo']) : [['Hộ lý','',0,'Chưa khai báo hộ lý']]),
     ['Quỹ công đoàn khoa', CFG.cdName||'Công đoàn khoa', P.cd, 'Phần còn lại = tổng quỹ trích − các khoản chi trên']
   ];
@@ -5135,7 +5135,7 @@ async function exportTN(mode){
       for(let k=1;k<=12;k++){ const c=ws.getCell(R,k); c.border=bd; c.font=font({bold:true}); c.fill=fill('F2F2F2'); } subs.push(R); subRef[key]=R; gNo[key]=RN[gi-1]; R++; };
     const htItems=[{name:CFG.ddt,nd:'Điều dưỡng trưởng',amt:P.ddt,ct:`Bình quân ${lbl} của ${P.c1.length} người nhóm Cọc 1 (dụng cụ)`},
       {name:CFG.hcpm,nd:'ĐD hành chính phòng mổ',amt:P.hcpm,ct:`Bình quân ${lbl} của ${P.c3.length} người nhóm Cọc 3 (gây mê)`},
-      {name:CFG.hck,nd:'ĐD hành chính khoa',amt:P.hck,ct:`${String(CFG.hckRatio).replace('.',',')} × mức HC phòng mổ`}];
+      {name:CFG.hck,nd:'ĐD hành chính hồi sức',amt:P.hck,ct:`${String(CFG.hckRatio).replace('.',',')} × mức HC phòng mổ`}];
     const hlItems=(P.hl||[]).map(h=>({name:h.name,nd:'Hộ lý',amt:+h.amt||0,ct:'Mức khai báo tháng'})).sort((x,y)=>y.amt-x.amt||x.name.localeCompare(y.name,'vi'));
     const htTot=htItems.reduce((a,x)=>a+x.amt,0);
     if(SEL.HT) group('HT','BỘ PHẬN HỖ TRỢ GIÁN TIẾP',htItems);
@@ -5150,7 +5150,7 @@ async function exportTN(mode){
       const comps=[['Trích '+CFG.pct+'% tài vụ chi phòng mổ',LAST.T.trich]].concat(P.eyeAdd?[['Trích '+CFG.pct+'% tiền phẫu thuật mắt (BS)',P.eyeAdd]]:[],P.dsaAdd?[['Trích '+CFG.pct+'% tiền phòng DSA',P.dsaAdd]]:[]);
       const rA=R; step('(a) Tổng quỹ trích '+CFG.pct+'%',{formula:`SUM(E${R+1}:E${R+comps.length})`,result:P.fund},'Gồm các khoản trích bên dưới',{bold:true});
       comps.forEach(([t,v])=>step('    – '+t,v,'',{sub:true}));
-      const rB=step('(b) Trừ: '+(gNo.HT?'Cộng nhóm '+gNo.HT+' – ':'')+'Hỗ trợ gián tiếp', subRef.HT? {formula:`E${subRef.HT}`,result:htTot} : htTot, subRef.HT? 'Lấy từ dòng "Cộng nhóm '+gNo.HT+'" phía trên' : 'ĐD trưởng + HC phòng mổ + HC khoa');
+      const rB=step('(b) Trừ: '+(gNo.HT?'Cộng nhóm '+gNo.HT+' – ':'')+'Hỗ trợ gián tiếp', subRef.HT? {formula:`E${subRef.HT}`,result:htTot} : htTot, subRef.HT? 'Lấy từ dòng "Cộng nhóm '+gNo.HT+'" phía trên' : 'ĐD trưởng + HC phòng mổ + HC hồi sức');
       const rC=step('(c) Trừ: '+(gNo.HL?'Cộng nhóm '+gNo.HL+' – ':'')+'Hộ lý', subRef.HL? {formula:`E${subRef.HL}`,result:P.hlTotal} : P.hlTotal, subRef.HL? 'Lấy từ dòng "Cộng nhóm '+gNo.HL+'" phía trên' : (P.hl||[]).length+' hộ lý');
       // dòng người nhận
       ws.getCell(R,1).value=1; ws.getCell(R,1).alignment={horizontal:'center',vertical:'middle'};
@@ -5204,16 +5204,18 @@ async function exportThu(){
   const R1=8, R2=R-1, thu=rows.filter(r=>r.net>0).reduce((a,x)=>a+x.net,0), chiPM=rows.filter(r=>r.net<0).reduce((a,x)=>a-x.net,0);
   const tr=ws.getRow(R); for(let k=1;k<=NC;k++){ const c=tr.getCell(k); c.border=bd; c.font=font({bold:true}); c.fill=fill('EDEDED'); }
   tr.getCell(2).value='Cộng ('+rows.length+' người)'; tr.getCell(4).value={formula:`SUM(D${R1}:D${R2})`,result:thu-chiPM}; tr.getCell(4).numFmt=FM; tr.getCell(4).alignment={horizontal:'right'}; R+=2;
-  const sm=[
-    ['TỔNG THU',{formula:`SUMIF(D${R1}:D${R2},">0")`,result:thu},'Tổng các số tiền đóng dương'],
-    ['CHI BS – DSA (chi lại phụ mê mắt, DSA)',{formula:`-SUMIF(D${R1}:D${R2},"<0")`,result:chiPM},'Tổng các số tiền âm trong bảng'],
-    ['CHI BỘ PHẬN GIÁN TIẾP',P.spent,'ĐD trưởng '+fmt(P.ddt)+'; HC phòng mổ '+fmt(P.hcpm)+'; HC khoa '+fmt(P.hck)+'; hộ lý '+fmt(P.hlTotal)],
-    ['CÒN LẠI (quỹ công đoàn khoa)',null,'= Tổng thu − Chi BS–DSA − Chi bộ phận gián tiếp']];
-  const s0=R;
-  sm.forEach(([a,b,n],i)=>{ ws.mergeCells(R,1,R,3); const c=ws.getCell(R,1); c.value=a; c.font=font({bold:true}); c.alignment={vertical:'middle'};
-    const v=ws.getCell(R,4); v.value= i===3? {formula:`D${s0}-D${s0+1}-D${s0+2}`,result:thu-chiPM-P.spent} : b; v.numFmt=FM; v.font=font({bold:true}); v.alignment={horizontal:'right',vertical:'middle'};
-    ws.mergeCells(R,5,R,6); const nn=ws.getCell(R,5); nn.value=''; nn.font=font({italic:true,size:10.5}); nn.alignment={wrapText:true,vertical:'middle'};
-    for(let k=1;k<=NC;k++){ const cc=ws.getCell(R,k); cc.border=bd; cc.fill=fill(i===3?'FFE699':'FFF2CC'); } ws.getRow(R).height=26; R++; });
+  const sm=[ ['TỔNG THU',null,{formula:`SUMIF(D${R1}:D${R2},">0")`,result:thu},0],
+    ['CHI BS – DSA (chi lại phụ mê mắt, DSA)',null,{formula:`-SUMIF(D${R1}:D${R2},"<0")`,result:chiPM},0],
+    ['CHI BỘ PHẬN GIÁN TIẾP',null,'GT',0],
+    ['– Điều dưỡng trưởng',CFG.ddt,P.ddt,1], ['– Điều dưỡng hành chính phòng mổ',CFG.hcpm,P.hcpm,1], ['– Điều dưỡng hành chính hồi sức',CFG.hck,P.hck,1],
+    ['– Tổng hộ lý ('+(P.hl||[]).length+' người)','',P.hlTotal,1],
+    ['CÒN LẠI (quỹ công đoàn khoa)',null,'CL',0] ];
+  const s0=R, rGT=s0+2;
+  sm.forEach(([a,who,val,sub],i)=>{ ws.mergeCells(R,1,R,3); const c=ws.getCell(R,1); c.value=a; c.font=font(sub?{size:11.5}:{bold:true}); c.alignment={vertical:'middle',indent:sub?2:0};
+    const v=ws.getCell(R,4); v.value= val==='GT'? {formula:`SUM(D${rGT+1}:D${rGT+4})`,result:P.spent} : val==='CL'? {formula:`D${s0}-D${s0+1}-D${rGT}`,result:thu-chiPM-P.spent} : val;
+    v.numFmt=FM; v.font=font(sub?{size:11.5}:{bold:true}); v.alignment={horizontal:'right',vertical:'middle'};
+    ws.mergeCells(R,5,R,6); const nn=ws.getCell(R,5); nn.value= sub&&who? who : ''; nn.font=font({size:11.5}); nn.alignment={vertical:'middle'};
+    for(let k=1;k<=NC;k++){ const cc=ws.getCell(R,k); cc.border=bd; cc.fill=fill(i===sm.length-1?'FFE699':sub?'FFFFFF':'FFF2CC'); } ws.getRow(R).height=sub?20:24; R++; });
   const sr=R+1; [[2,'Người lập bảng'],[5,'Trưởng khoa']].forEach(([col,txt])=>{ const c=ws.getCell(sr,col); c.value=txt; c.font=font({bold:true}); c.alignment={horizontal:'center'}; const d=ws.getCell(sr+1,col); d.value='(Ký, ghi rõ họ tên)'; d.font=font({italic:true,size:11}); d.alignment={horizontal:'center'}; });
   ws.pageSetup.printArea='A1:F'+(sr+4); ws.pageSetup.printTitlesRow='7:7'; ws.pageSetup.horizontalCentered=true;
   try{ const buf=await wb.xlsx.writeBuffer(); const el=document.createElement('a'); el.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
@@ -5314,7 +5316,7 @@ function exportXlsx(){
   const s2=head('BẢNG PHÂN BỔ TIỀN TRÍCH CHO BỘ PHẬN HỖ TRỢ GIÁN TIẾP').concat([['Nội dung','Người nhận','Số tiền','Cách tính']],
     [['Trích từ file Tài chính','',T.trich,''],['Trích tiền phẫu thuật mắt (BS)','',P.eyeAdd,CFG.eyeToFund?'Có cộng vào quỹ':'Không cộng'],['TỔNG QUỸ TRÍCH','',P.fund,''],[],
      ['Điều dưỡng trưởng',CFG.ddt,P.ddt,'Bình quân Cọc 1 DC ('+P.c1.length+' người)'],['ĐD hành chính phòng mổ',CFG.hcpm,P.hcpm,'Bình quân Cọc 3 GM ('+P.c3.length+' người)'],
-     ['ĐD hành chính khoa',CFG.hck,P.hck,CFG.hckRatio+' × HC phòng mổ'],...(P.hl.length? P.hl.map((h,k)=>[k?'':'Hộ lý ('+P.hl.length+' người)',h.name,+h.amt||0,'Mức khai báo']) : [['Hộ lý','',0,'']]),['Quỹ công đoàn khoa','',P.cd,'Phần còn lại']]);
+     ['ĐD hành chính hồi sức',CFG.hck,P.hck,CFG.hckRatio+' × HC phòng mổ'],...(P.hl.length? P.hl.map((h,k)=>[k?'':'Hộ lý ('+P.hl.length+' người)',h.name,+h.amt||0,'Mức khai báo']) : [['Hộ lý','',0,'']]),['Quỹ công đoàn khoa','',P.cd,'Phần còn lại']]);
   XLSX.utils.book_append_sheet(wb,sheet(s2,[30,30,16,36]),'Phan bo');
   const s3=head('BẢNG TIỀN PHẪU THUẬT MẮT – BÁC SĨ GÂY MÊ HỒI SỨC').concat([['STT','Bác sĩ','Ca GM chính','Ca GM phụ','Tổng tiền','Trích '+CFG.pct+'%','Còn lại','BS thực nhận','Nộp lại']],
     E.bs.map((b,i)=>[i+1,b.name,b.nc,b.np,b.tong,b.trich,b.con,b.nhan,b.nop]),[['','Cộng','','',E.tong,E.trich,E.con,E.nhan,E.pool]]);
