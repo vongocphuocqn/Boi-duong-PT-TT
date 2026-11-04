@@ -899,7 +899,7 @@ table.tr-t input[type=number]{width:120px; text-align:right;}
   <!-- ===================== TAB 6: TRÍCH TIỀN PT (bổ sung) ===================== -->
   <section class="tab" id="tab-trich">
   <div class="tr-root" id="trRoot">
-  <div class="tr-bar"><div class="t">Trích 6% cá nhân · phân bổ bộ phận hỗ trợ gián tiếp · chia tiền phẫu thuật mắt cho bác sĩ GMHS (BS 6 : nộp lại 4) · <b style="font-style:normal;color:var(--tr-accent)">Bản 04/11/2026 – v33</b></div>
+  <div class="tr-bar"><div class="t">Trích 6% cá nhân · phân bổ bộ phận hỗ trợ gián tiếp · chia tiền phẫu thuật mắt cho bác sĩ GMHS (BS 6 : nộp lại 4) · <b style="font-style:normal;color:var(--tr-accent)">Bản 04/11/2026 – v34</b></div>
     <div class="tr-month"><label for="trMonth">Kỳ tính</label><input type="text" id="trMonth" placeholder="Tháng 8/2026"><button class="tr-btn sec" id="trClose" type="button" title="Đóng thẻ 6 và quay về thẻ 1. Nhập dữ liệu">✕ Đóng · về trang chủ</button></div></div>
 
   <nav class="tr-tabs" role="tablist">
@@ -936,6 +936,7 @@ table.tr-t input[type=number]{width:120px; text-align:right;}
       <h2>Tóm tắt kỳ tính</h2>
       <div class="tr-kpis" id="trKpiAll"></div>
       <div class="tr-toolbar">
+        <button class="tr-btn" id="trSavePeriod" style="background:var(--tr-good);border-color:var(--tr-good)">💾 Lưu kỳ tính này</button>
         <button class="tr-btn" id="trExport">⬇ Xuất Excel (tất cả bảng)</button>
         <button class="tr-btn sec" id="trClearData">Xoá dữ liệu file đã nạp</button>
         <button class="tr-btn sec" id="trBackup">Sao lưu cấu hình (JSON)</button>
@@ -944,6 +945,11 @@ table.tr-t input[type=number]{width:120px; text-align:right;}
       </div>
       <p class="tr-muted">Dữ liệu và cấu hình của thẻ này lưu chung kho với ứng dụng (khoá trich:cfg, trich:data) và được đồng bộ theo Mã đồng bộ nếu anh đã bật.</p>
       <div id="trConfirm"></div>
+    </div>
+    <div class="tr-card">
+      <h2>Các kỳ tính đã lưu</h2>
+      <p class="tr-muted">Mỗi tháng sau khi nạp đủ file và khai báo xong, bấm “💾 Lưu kỳ tính này”. Kỳ được lưu gồm file đã nạp, các ô tick và cấu hình của tháng đó, để mở lại xem hoặc xuất Excel bất cứ lúc nào. Lưu trùng tên kỳ sẽ ghi đè bản cũ.</p>
+      <div id="trPeriods"></div>
     </div>
   </section>
 
@@ -5023,6 +5029,39 @@ async function exportDSA(){
     el.download='DSA_ThucNhan_'+(m||'ky').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[đĐ]/g,'d').replace(/[^\dA-Za-z]+/g,'_')+'.xlsx'; document.body.appendChild(el); el.click(); el.remove(); toast('Đã xuất bảng DSA'); }
   catch(e){ toast('Trình duyệt chặn tải file — dùng nút “Sao chép bảng”'); }
 }
+/* ---------------- LƯU KỲ TÍNH (mỗi tháng một bản) ---------------- */
+const KEY_PIDX='trich:periods'; let PIDX=[];
+function pid(m){ return 'p_'+String(m||'ky').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[đĐ]/g,'d').replace(/[^\dA-Za-z]+/g,'_'); }
+async function delKey(k){ try{ if(APP && typeof sDelete==='function') return await sDelete(k); if(hasWS()) await window.storage.delete(k,false); else localStorage.removeItem(k); }catch(e){} }
+async function loadPIDX(){ PIDX=(await load(KEY_PIDX))||[]; renderPeriods(); }
+function fillInputs(){ const m={trPct:'pct',trBasis:'basis',trDDT:'ddt',trHCPM:'hcpm',trHCK:'hck',trHCKr:'hckRatio',trScope:'scope',trPrefix:'prefix',trBsPct:'bsPct',trMonth:'month',trCDName:'cdName',trCDStk:'cdStk',trHLamt:'hlMuc'};
+  Object.keys(m).forEach(id=>{ const el=$(id); if(el) el.value=CFG[m[id]]==null?'':CFG[m[id]]; }); const e=$('trEyeToFund'); if(e) e.checked=!!CFG.eyeToFund; }
+async function savePeriod(){
+  if(!DATA.fin && !DATA.his && !DATA.dsa){ toast('Chưa nạp file nào để lưu'); return; }
+  const m=(CFG.month||'').trim()||'Kỳ chưa đặt tên', id=pid(m), L=LAST||{};
+  const his=DATA.his||null;
+  const files=[DATA.fin&&DATA.fin.file, DATA.his&&DATA.his.file, DATA.dsa&&DATA.dsa.file].filter(Boolean);
+  const sum={nv:L.T?L.T.rows.length:0, tc:L.T?L.T.amt:0, fund:L.P?L.P.fund:0, cd:L.P?L.P.cd:0, dsa:L.DS?L.DS.S:0};
+  const snap={id,month:m,savedAt:new Date().toISOString(),data:{fin:DATA.fin,his,dsa:DATA.dsa||null},cfg:JSON.parse(JSON.stringify(CFG)),sum};
+  const ok=await save('trich:period:'+id,snap); if(ok===false){ toast('Lưu kỳ không thành công — kiểm tra dung lượng trình duyệt'); return; }
+  PIDX=PIDX.filter(x=>x.id!==id); PIDX.unshift({id,month:m,savedAt:snap.savedAt,files,sum}); await save(KEY_PIDX,PIDX);
+  renderPeriods(); toast('Đã lưu kỳ: '+m);
+}
+async function openPeriod(id){
+  const s=await load('trich:period:'+id); if(!s){ toast('Không đọc được kỳ này'); return; }
+  DATA=Object.assign({fin:null,his:null,dsa:null},s.data); CFG=Object.assign(defaultCfg(),s.cfg);
+  await save(KEY_DATA,DATA); persist(); fillInputs(); renderRates(); renderAll(); renderPeriods();
+  toast('Đã mở kỳ: '+s.month); try{ window.scrollTo({top:0,behavior:'smooth'}); }catch(e){}
+}
+async function deletePeriod(id){ await delKey('trich:period:'+id); PIDX=PIDX.filter(x=>x.id!==id); await save(KEY_PIDX,PIDX); renderPeriods(); toast('Đã xoá kỳ'); }
+function renderPeriods(){
+  const el=$('trPeriods'); if(!el) return; const cur=pid(CFG.month);
+  el.innerHTML = PIDX.length? `<div class="tr-scroll"><table class="tr-t"><thead><tr><th>Kỳ tính</th><th>Lưu lúc</th><th>File đã nạp</th><th class="n">Tổng TC chi (GMHS)</th><th class="n">Tổng quỹ trích</th><th class="n">Quỹ công đoàn</th><th></th></tr></thead><tbody>${
+    PIDX.map(p=>`<tr><td><b>${esc(p.month)}</b>${p.id===cur?' <span class="tr-pill ok">đang mở</span>':''}</td><td>${new Date(p.savedAt).toLocaleString('vi-VN')}</td><td class="tr-muted" style="white-space:normal">${p.files.map(esc).join('<br>')}</td>
+      <td class="n">${fmt(p.sum.tc)}</td><td class="n">${fmt(p.sum.fund)}</td><td class="n">${fmt(p.sum.cd)}</td>
+      <td style="white-space:nowrap"><button class="tr-btn sm" data-popen="${p.id}">Mở lại</button> <button class="tr-btn del sm" data-pdel="${p.id}">Xoá</button></td></tr>`).join('')}</tbody></table></div>`
+    : '<p class="tr-muted">Chưa có kỳ nào được lưu.</p>';
+}
 function loadExcelJS(){
   if(window.ExcelJS) return Promise.resolve(window.ExcelJS);
   return new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
@@ -5405,6 +5444,10 @@ function bindAll(){
       persist(); renderAll(); toast('Đã xoá '+b.dataset.gmrm+' khỏi danh sách gây mê phụ'); });
     g.addEventListener('input',e=>{ if(e.target.dataset.flt!==undefined){ g._f=e.target.value; renderGroupGM(); const inp=g.querySelector('[data-flt]'); inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length); } }); });
   $('trExport').addEventListener('click',exportXlsx);
+  $('trSavePeriod').addEventListener('click',()=>{ const m=(CFG.month||'').trim(); if(PIDX.some(x=>x.id===pid(m))){ confirmBox('Kỳ “'+esc(m)+'” đã được lưu trước đó. Ghi đè bằng số liệu hiện tại?',savePeriod); } else savePeriod(); });
+  $('trPeriods').addEventListener('click',e=>{ const o=e.target.closest('[data-popen]'), d=e.target.closest('[data-pdel]');
+    if(o){ const p=PIDX.find(x=>x.id===o.dataset.popen); confirmBox('Mở lại kỳ “'+esc(p?p.month:'')+'”? Dữ liệu và ô tick đang dùng sẽ được thay bằng của kỳ này (nhớ lưu kỳ hiện tại trước nếu chưa lưu).',()=>openPeriod(o.dataset.popen)); }
+    if(d){ if(!d.dataset.armed){ d.dataset.armed='1'; d.textContent='Chắc chắn?'; setTimeout(()=>{ if(d.isConnected){ delete d.dataset.armed; d.textContent='Xoá'; } },3000); return; } deletePeriod(d.dataset.pdel); } });
   $('trExportDC').addEventListener('click',exportDC);
   $('trExportDSA').addEventListener('click',exportDSA);
   $('trDsaMode').addEventListener('change',e=>{ CFG.dsaMode=e.target.value; persist(); renderAll(); });
@@ -5463,7 +5506,7 @@ async function start(){
   if(!Array.isArray(CFG.hl)){ CFG.hl=String(CFG.hlTen||'').split(/\n/).map(x=>x.trim()).filter(Boolean).map(n=>({name:n,amt:+CFG.hlMuc||0})); persist(); } /* mặc định: không cộng 6% tiền mắt vào quỹ trích khoa */
   const d=await load(KEY_DATA); if(d) DATA=Object.assign({fin:null,his:null},d);
   if(!BOUND){ bindAll(); BOUND=true; }
-  syncInputs(); renderRates(); renderAll();
+  syncInputs(); renderRates(); renderAll(); loadPIDX();
 }
 let BOUND=false;
 function syncInputs(){ const m={trPct:'pct',trBasis:'basis',trDDT:'ddt',trHCPM:'hcpm',trHCK:'hck',trHCKr:'hckRatio',trHLmuc:'hlMuc',trHLsl:'hlSl',trHLten:'hlTen',trScope:'scope',trPrefix:'prefix',trBsPct:'bsPct',trMonth:'month',trCDName:'cdName',trCDStk:'cdStk'};
