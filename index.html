@@ -898,7 +898,7 @@ table.tr-t input[type=number]{width:120px; text-align:right;}
   <!-- ===================== TAB 6: TRÍCH TIỀN PT (bổ sung) ===================== -->
   <section class="tab" id="tab-trich">
   <div class="tr-root" id="trRoot">
-  <div class="tr-bar"><div class="t">Trích 6% cá nhân · phân bổ bộ phận hỗ trợ gián tiếp · chia tiền phẫu thuật mắt cho bác sĩ GMHS (BS 6 : nộp lại 4) · <b style="font-style:normal;color:var(--tr-accent)">Bản 04/11/2026 – v31</b></div>
+  <div class="tr-bar"><div class="t">Trích 6% cá nhân · phân bổ bộ phận hỗ trợ gián tiếp · chia tiền phẫu thuật mắt cho bác sĩ GMHS (BS 6 : nộp lại 4) · <b style="font-style:normal;color:var(--tr-accent)">Bản 04/11/2026 – v32</b></div>
     <div class="tr-month"><label for="trMonth">Kỳ tính</label><input type="text" id="trMonth" placeholder="Tháng 8/2026"><button class="tr-btn sec" id="trClose" type="button" title="Đóng thẻ 6 và quay về thẻ 1. Nhập dữ liệu">✕ Đóng · về trang chủ</button></div></div>
 
   <nav class="tr-tabs" role="tablist">
@@ -5191,21 +5191,22 @@ async function exportThu(){
     return {name:r.name,net,note:(net<0?'Hành chính chi lại '+fmt(-net)+' — ':'')+g.join('; ')}; }).filter(r=>r.net!==0);
   const wb=new EJ.Workbook(), ws=wb.addWorksheet('Thu tien',{pageSetup:{paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0,margins:{left:0.5,right:0.4,top:0.5,bottom:0.5,header:0.2,footer:0.2}},views:[{state:'frozen',ySplit:7}]});
   const font=o=>Object.assign({name:'Times New Roman',size:12},o||{}), thin={style:'thin',color:{argb:'FF000000'}}, bd={top:thin,left:thin,bottom:thin,right:thin}, fill=c=>({type:'pattern',pattern:'solid',fgColor:{argb:'FF'+c}}), FM='#,##0;[Red]-#,##0;0';
-  const NC=6; ws.columns=[6,26,10,16,40,15].map(w=>({width:w}));
+  const NC=7; ws.columns=[6,26,10,16,16,30,15].map(w=>({width:w}));
   const line=(r,txt,o,c1,c2)=>{ ws.mergeCells(r,c1,r,c2); const c=ws.getCell(r,c1); c.value=txt; c.font=font(o); c.alignment={horizontal:'center',vertical:'middle',wrapText:true}; };
   line(1,'BỆNH VIỆN ĐA KHOA TRUNG TÂM',{bold:true,size:11},1,3); line(2,'KHOA GÂY MÊ HỒI SỨC',{bold:true,size:11},1,3);
-  line(4,'BẢNG THU TIỀN TRÍCH NỘP',{bold:true,size:14},1,NC); line(5,m+'   ·   Số tiền đóng = các khoản nộp − phần được nhận lại (số âm: hành chính chi lại)',{italic:true,size:11},1,NC);
+  line(4,'BẢNG THU TIỀN TRÍCH NỘP',{bold:true,size:14},1,NC); line(5,m,{},1,NC);
   const hr=ws.getRow(7); hr.height=30;
-  ['STT','Họ và tên','Tháng','Số tiền đóng (đồng)','Ghi chú','Ký tên'].forEach((h,i)=>{ const c=hr.getCell(i+1); c.value=h; c.font=font({bold:true}); c.alignment={horizontal:'center',vertical:'middle',wrapText:true}; c.border=bd; c.fill=fill(i===3?'F4B183':'D9D9D9'); });
+  ['STT','Họ và tên','Tháng','Số tiền đóng (đồng)','Hành chính chi lại (đồng)','Ghi chú','Ký tên'].forEach((h,i)=>{ const c=hr.getCell(i+1); c.value=h; c.font=font({bold:true}); c.alignment={horizontal:'center',vertical:'middle',wrapText:true}; c.border=bd; c.fill=fill(i===3?'F4B183':i===4?'C6E0B4':'D9D9D9'); });
   let R=8;
-  rows.forEach((r,i)=>{ const row=ws.getRow(R); [i+1,r.name,thang,r.net,'',''].forEach((x,k)=>{ const c=row.getCell(k+1); c.value=x; c.border=bd;
-      c.font=font(k===3?{bold:true}:k===4?{italic:true,size:10.5}:{}); c.alignment={vertical:'middle',horizontal:k===0||k===2?'center':k===3?'right':'left',wrapText:k===4};
-      if(k===3){ c.numFmt=FM; c.fill=fill(r.net<0?'E2EFDA':'FBE5D6'); } }); row.height=22; R++; });
+  rows.forEach((r,i)=>{ const row=ws.getRow(R); [i+1,r.name,thang,r.net>0?r.net:null,r.net<0?-r.net:null,'',''].forEach((x,k)=>{ const c=row.getCell(k+1); c.value=x; c.border=bd;
+      c.font=font(k===3||k===4?{bold:true}:{}); c.alignment={vertical:'middle',horizontal:k===0||k===2?'center':k===3||k===4?'right':'left'};
+      if(k===3||k===4){ c.numFmt='#,##0'; if(x) c.fill=fill(k===3?'FBE5D6':'E2EFDA'); } }); row.height=22; R++; });
   const R1=8, R2=R-1, thu=rows.filter(r=>r.net>0).reduce((a,x)=>a+x.net,0), chiPM=rows.filter(r=>r.net<0).reduce((a,x)=>a-x.net,0);
   const tr=ws.getRow(R); for(let k=1;k<=NC;k++){ const c=tr.getCell(k); c.border=bd; c.font=font({bold:true}); c.fill=fill('EDEDED'); }
-  tr.getCell(2).value='Cộng ('+rows.length+' người)'; tr.getCell(4).value={formula:`SUM(D${R1}:D${R2})`,result:thu-chiPM}; tr.getCell(4).numFmt=FM; tr.getCell(4).alignment={horizontal:'right'}; R+=2;
-  const sm=[ ['TỔNG THU',null,{formula:`SUMIF(D${R1}:D${R2},">0")`,result:thu},0],
-    ['CHI BS – DSA (chi lại phụ mê mắt, DSA)',null,{formula:`-SUMIF(D${R1}:D${R2},"<0")`,result:chiPM},0],
+  tr.getCell(2).value='Cộng ('+rows.length+' người)'; tr.getCell(4).value={formula:`SUM(D${R1}:D${R2})`,result:thu}; tr.getCell(5).value={formula:`SUM(E${R1}:E${R2})`,result:chiPM};
+  [4,5].forEach(k=>{ tr.getCell(k).numFmt='#,##0'; tr.getCell(k).alignment={horizontal:'right'}; }); const RC=R; R+=2;
+  const sm=[ ['TỔNG THU',null,{formula:`D${RC}`,result:thu},0],
+    ['CHI BS – DSA (hành chính chi lại phụ mê)',null,{formula:`E${RC}`,result:chiPM},0],
     ['CHI BỘ PHẬN GIÁN TIẾP',null,'GT',0],
     ['– Điều dưỡng trưởng',CFG.ddt,P.ddt,1], ['– Điều dưỡng hành chính phòng mổ',CFG.hcpm,P.hcpm,1], ['– Điều dưỡng hành chính hồi sức',CFG.hck,P.hck,1],
     ['– Tổng hộ lý ('+(P.hl||[]).length+' người)','',P.hlTotal,1],
@@ -5214,10 +5215,10 @@ async function exportThu(){
   sm.forEach(([a,who,val,sub],i)=>{ ws.mergeCells(R,1,R,3); const c=ws.getCell(R,1); c.value=a; c.font=font(sub?{size:11.5}:{bold:true}); c.alignment={vertical:'middle',indent:sub?2:0};
     const v=ws.getCell(R,4); v.value= val==='GT'? {formula:`SUM(D${rGT+1}:D${rGT+4})`,result:P.spent} : val==='CL'? {formula:`D${s0}-D${s0+1}-D${rGT}`,result:thu-chiPM-P.spent} : val;
     v.numFmt=FM; v.font=font(sub?{size:11.5}:{bold:true}); v.alignment={horizontal:'right',vertical:'middle'};
-    ws.mergeCells(R,5,R,6); const nn=ws.getCell(R,5); nn.value= sub&&who? who : ''; nn.font=font({size:11.5}); nn.alignment={vertical:'middle'};
+    ws.mergeCells(R,5,R,7); const nn=ws.getCell(R,5); nn.value= sub&&who? who : ''; nn.font=font({size:11.5}); nn.alignment={vertical:'middle'};
     for(let k=1;k<=NC;k++){ const cc=ws.getCell(R,k); cc.border=bd; cc.fill=fill(i===sm.length-1?'FFE699':sub?'FFFFFF':'FFF2CC'); } ws.getRow(R).height=sub?20:24; R++; });
-  const sr=R+1; [[2,'Người lập bảng'],[5,'Trưởng khoa']].forEach(([col,txt])=>{ const c=ws.getCell(sr,col); c.value=txt; c.font=font({bold:true}); c.alignment={horizontal:'center'}; const d=ws.getCell(sr+1,col); d.value='(Ký, ghi rõ họ tên)'; d.font=font({italic:true,size:11}); d.alignment={horizontal:'center'}; });
-  ws.pageSetup.printArea='A1:F'+(sr+4); ws.pageSetup.printTitlesRow='7:7'; ws.pageSetup.horizontalCentered=true;
+  const sr=R+1; [[2,'Người lập bảng'],[6,'Trưởng khoa']].forEach(([col,txt])=>{ const c=ws.getCell(sr,col); c.value=txt; c.font=font({bold:true}); c.alignment={horizontal:'center'}; const d=ws.getCell(sr+1,col); d.value='(Ký, ghi rõ họ tên)'; d.font=font({italic:true,size:11}); d.alignment={horizontal:'center'}; });
+  ws.pageSetup.printArea='A1:G'+(sr+4); ws.pageSetup.printTitlesRow='7:7'; ws.pageSetup.horizontalCentered=true;
   try{ const buf=await wb.xlsx.writeBuffer(); const el=document.createElement('a'); el.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
     el.download='ThuTien_TrichNop_'+(m||'ky').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[đĐ]/g,'d').replace(/[^\dA-Za-z]+/g,'_')+'.xlsx'; document.body.appendChild(el); el.click(); el.remove(); toast('Đã xuất bảng thu tiền'); }
   catch(e){ toast('Trình duyệt chặn tải file — dùng nút “Sao chép bảng”'); }
