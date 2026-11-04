@@ -179,6 +179,8 @@
 .tr-head .sub{font-size:13px; color:var(--tr-mute); font-style:italic;}
 .tr-month{display:flex; gap:8px; align-items:center; font-size:14px;}
 .tr-month input{width:150px;}
+.tr-month{flex-wrap:wrap;}
+#trClose{margin-left:8px;}
 .tr-tabs{display:flex; flex-wrap:wrap; gap:2px; border-bottom:1px solid var(--tr-line); margin-bottom:16px;}
 .tr-tabs button{font-family:inherit; font-size:14.5px; padding:9px 14px; border:1px solid var(--tr-line); border-bottom:none; background:var(--tr-soft); color:var(--tr-mute); cursor:pointer; border-radius:4px 4px 0 0; margin-bottom:-1px;}
 .tr-tabs button[aria-selected="true"]{background:var(--tr-bg); color:var(--tr-navy); font-weight:bold; border-color:var(--tr-navy2); border-bottom:2px solid var(--tr-bg);}
@@ -896,8 +898,8 @@ table.tr-t input[type=number]{width:120px; text-align:right;}
   <!-- ===================== TAB 6: TRÍCH TIỀN PT (bổ sung) ===================== -->
   <section class="tab" id="tab-trich">
   <div class="tr-root" id="trRoot">
-  <div class="tr-bar"><div class="t">Trích 6% cá nhân · phân bổ bộ phận hỗ trợ gián tiếp · chia tiền phẫu thuật mắt cho bác sĩ GMHS (BS 6 : nộp lại 4) · <b style="font-style:normal;color:var(--tr-accent)">Bản 04/11/2026 – v25</b></div>
-    <div class="tr-month"><label for="trMonth">Kỳ tính</label><input type="text" id="trMonth" placeholder="Tháng 8/2026"></div></div>
+  <div class="tr-bar"><div class="t">Trích 6% cá nhân · phân bổ bộ phận hỗ trợ gián tiếp · chia tiền phẫu thuật mắt cho bác sĩ GMHS (BS 6 : nộp lại 4) · <b style="font-style:normal;color:var(--tr-accent)">Bản 04/11/2026 – v26</b></div>
+    <div class="tr-month"><label for="trMonth">Kỳ tính</label><input type="text" id="trMonth" placeholder="Tháng 8/2026"><button class="tr-btn sec" id="trClose" type="button" title="Đóng thẻ 6 và quay về thẻ 1. Nhập dữ liệu">✕ Đóng · về trang chủ</button></div></div>
 
   <nav class="tr-tabs" role="tablist">
     <button role="tab" data-p="nhap" aria-selected="true">Nhập file</button>
@@ -5428,6 +5430,16 @@ window.TrichPT={start, recalc:renderAll, _calc:()=>LAST};
 /* Khởi động khi mở thẻ 6 lần đầu (lúc đó app đã nạp xong Danh mục nhân viên) */
 const navBtn=document.getElementById('navTrichBtn');
 if(navBtn) navBtn.addEventListener('click',()=>{ if(!STARTED) start(); else renderAll(); });
+/* Về trang chủ (thẻ 1) */
+function goHome(){ const b=document.querySelector('nav.tabs button[data-tab="import"]'); if(b) b.click(); try{ window.scrollTo({top:0,behavior:'smooth'}); }catch(e){ window.scrollTo(0,0); } }
+const closeBtn=document.getElementById('trClose'); if(closeBtn) closeBtn.addEventListener('click',goHome);
+/* Kiểm tra quyền độc lập: chỉ Admin thấy và mở được thẻ 6 */
+function trIsAdmin(){ try{ if(typeof CURRENT_ROLE!=='undefined') return CURRENT_ROLE==='admin'; }catch(e){} try{ return localStorage.getItem('boiduong_pttt_role')==='admin'; }catch(e){ return false; } }
+function trEnforce(){ const a=trIsAdmin(), sec=document.getElementById('tab-trich');
+  if(navBtn) navBtn.style.display=a?'':'none';
+  if(!a && sec && (sec.classList.contains('active') || (navBtn && navBtn.classList.contains('active')))){ sec.classList.remove('active'); goHome(); } }
+if(navBtn) navBtn.addEventListener('click',e=>{ if(!trIsAdmin()){ e.preventDefault(); e.stopImmediatePropagation(); goHome(); } },true);
+setInterval(trEnforce,500); trEnforce();
 /* Thẻ 6 chỉ hiện với Admin — bọc thêm, không sửa hàm phân quyền gốc */
 if(typeof applyRolePermissions==='function'){
   const _orig=applyRolePermissions;
