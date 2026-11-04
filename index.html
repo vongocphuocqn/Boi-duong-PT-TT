@@ -181,6 +181,7 @@
 .tr-month input{width:150px;}
 .tr-month{flex-wrap:wrap;}
 #trClose{margin-left:8px;}
+#trConfirm:not(:empty){position:fixed;left:50%;top:18%;transform:translateX(-50%);z-index:10000;width:min(560px,92vw);background:#fff;border:1px solid var(--tr-navy2);border-radius:6px;box-shadow:0 12px 40px rgba(0,0,0,.25);padding:4px;}
 .tr-tabs{display:flex; flex-wrap:wrap; gap:2px; border-bottom:1px solid var(--tr-line); margin-bottom:16px;}
 .tr-tabs button{font-family:inherit; font-size:14.5px; padding:9px 14px; border:1px solid var(--tr-line); border-bottom:none; background:var(--tr-soft); color:var(--tr-mute); cursor:pointer; border-radius:4px 4px 0 0; margin-bottom:-1px;}
 .tr-tabs button[aria-selected="true"]{background:var(--tr-bg); color:var(--tr-navy); font-weight:bold; border-color:var(--tr-navy2); border-bottom:2px solid var(--tr-bg);}
@@ -899,15 +900,17 @@ table.tr-t input[type=number]{width:120px; text-align:right;}
   <!-- ===================== TAB 6: TRÍCH TIỀN PT (bổ sung) ===================== -->
   <section class="tab" id="tab-trich">
   <div class="tr-root" id="trRoot">
-  <div class="tr-bar"><div class="t">Trích 6% cá nhân · phân bổ bộ phận hỗ trợ gián tiếp · chia tiền phẫu thuật mắt cho bác sĩ GMHS (BS 6 : nộp lại 4) · <b style="font-style:normal;color:var(--tr-accent)">Bản 04/11/2026 – v34</b></div>
-    <div class="tr-month"><label for="trMonth">Kỳ tính</label><input type="text" id="trMonth" placeholder="Tháng 8/2026"><button class="tr-btn sec" id="trClose" type="button" title="Đóng thẻ 6 và quay về thẻ 1. Nhập dữ liệu">✕ Đóng · về trang chủ</button></div></div>
+  <div class="tr-bar"><div class="t">Trích 6% cá nhân · phân bổ bộ phận hỗ trợ gián tiếp · chia tiền phẫu thuật mắt cho bác sĩ GMHS (BS 6 : nộp lại 4) · <b style="font-style:normal;color:var(--tr-accent)">Bản 04/11/2026 – v35</b></div>
+    <div class="tr-month"><label for="trMonth">Kỳ tính</label><input type="text" id="trMonth" placeholder="Tháng 8/2026"><button class="tr-btn" id="trSavePeriod" type="button" style="background:var(--tr-good);border-color:var(--tr-good);margin-left:8px" title="Lưu toàn bộ file, ô tick và cấu hình của kỳ này">💾 Lưu kỳ tính</button><button class="tr-btn sec" id="trClose" type="button" title="Đóng thẻ 6 và quay về thẻ 1. Nhập dữ liệu">✕ Đóng · về trang chủ</button></div></div>
 
+  <div id="trConfirm"></div>
   <nav class="tr-tabs" role="tablist">
     <button role="tab" data-p="nhap" aria-selected="true">Nhập file</button>
     <button role="tab" data-p="nhansu" aria-selected="false">Nhân sự &amp; cấu hình</button>
     <button role="tab" data-p="trich" aria-selected="false">Trích 6% &amp; phân bổ</button>
     <button role="tab" data-p="mat" aria-selected="false">Phẫu thuật mắt</button>
     <button role="tab" data-p="dsa" aria-selected="false">Phòng DSA</button>
+    <button role="tab" data-p="ky" aria-selected="false" id="trTabKy">📂 Kỳ đã lưu</button>
   </nav>
 
   <!-- ================= 1. NHẬP FILE ================= -->
@@ -936,7 +939,6 @@ table.tr-t input[type=number]{width:120px; text-align:right;}
       <h2>Tóm tắt kỳ tính</h2>
       <div class="tr-kpis" id="trKpiAll"></div>
       <div class="tr-toolbar">
-        <button class="tr-btn" id="trSavePeriod" style="background:var(--tr-good);border-color:var(--tr-good)">💾 Lưu kỳ tính này</button>
         <button class="tr-btn" id="trExport">⬇ Xuất Excel (tất cả bảng)</button>
         <button class="tr-btn sec" id="trClearData">Xoá dữ liệu file đã nạp</button>
         <button class="tr-btn sec" id="trBackup">Sao lưu cấu hình (JSON)</button>
@@ -944,11 +946,12 @@ table.tr-t input[type=number]{width:120px; text-align:right;}
         <input type="file" id="trRestore" accept=".json" hidden>
       </div>
       <p class="tr-muted">Dữ liệu và cấu hình của thẻ này lưu chung kho với ứng dụng (khoá trich:cfg, trich:data) và được đồng bộ theo Mã đồng bộ nếu anh đã bật.</p>
-      <div id="trConfirm"></div>
     </div>
+  </section>
+  <section class="tr-pane" id="trp-ky">
     <div class="tr-card">
       <h2>Các kỳ tính đã lưu</h2>
-      <p class="tr-muted">Mỗi tháng sau khi nạp đủ file và khai báo xong, bấm “💾 Lưu kỳ tính này”. Kỳ được lưu gồm file đã nạp, các ô tick và cấu hình của tháng đó, để mở lại xem hoặc xuất Excel bất cứ lúc nào. Lưu trùng tên kỳ sẽ ghi đè bản cũ.</p>
+      <p class="tr-muted">Mỗi tháng sau khi nạp đủ file và khai báo xong, bấm nút xanh “💾 Lưu kỳ tính” ở góc trên (cạnh ô Kỳ tính, thấy được ở mọi trang). Kỳ được lưu gồm file đã nạp, các ô tick và cấu hình của tháng đó, để mở lại xem hoặc xuất Excel bất cứ lúc nào. Lưu trùng tên kỳ sẽ ghi đè bản cũ.</p>
       <div id="trPeriods"></div>
     </div>
   </section>
@@ -5038,6 +5041,7 @@ function fillInputs(){ const m={trPct:'pct',trBasis:'basis',trDDT:'ddt',trHCPM:'
   Object.keys(m).forEach(id=>{ const el=$(id); if(el) el.value=CFG[m[id]]==null?'':CFG[m[id]]; }); const e=$('trEyeToFund'); if(e) e.checked=!!CFG.eyeToFund; }
 async function savePeriod(){
   if(!DATA.fin && !DATA.his && !DATA.dsa){ toast('Chưa nạp file nào để lưu'); return; }
+  if(!(CFG.month||'').trim()){ toast('Anh gõ tên kỳ (ví dụ Tháng 8/2026) vào ô Kỳ tính trước khi lưu'); const mi=$('trMonth'); if(mi) mi.focus(); return; }
   const m=(CFG.month||'').trim()||'Kỳ chưa đặt tên', id=pid(m), L=LAST||{};
   const his=DATA.his||null;
   const files=[DATA.fin&&DATA.fin.file, DATA.his&&DATA.his.file, DATA.dsa&&DATA.dsa.file].filter(Boolean);
@@ -5045,16 +5049,17 @@ async function savePeriod(){
   const snap={id,month:m,savedAt:new Date().toISOString(),data:{fin:DATA.fin,his,dsa:DATA.dsa||null},cfg:JSON.parse(JSON.stringify(CFG)),sum};
   const ok=await save('trich:period:'+id,snap); if(ok===false){ toast('Lưu kỳ không thành công — kiểm tra dung lượng trình duyệt'); return; }
   PIDX=PIDX.filter(x=>x.id!==id); PIDX.unshift({id,month:m,savedAt:snap.savedAt,files,sum}); await save(KEY_PIDX,PIDX);
-  renderPeriods(); toast('Đã lưu kỳ: '+m);
+  renderPeriods(); toast('✔ Đã lưu kỳ: '+m+' — xem ở mục “📂 Kỳ đã lưu”'); const tb=$('trTabKy'); if(tb) tb.click();
 }
 async function openPeriod(id){
   const s=await load('trich:period:'+id); if(!s){ toast('Không đọc được kỳ này'); return; }
   DATA=Object.assign({fin:null,his:null,dsa:null},s.data); CFG=Object.assign(defaultCfg(),s.cfg);
   await save(KEY_DATA,DATA); persist(); fillInputs(); renderRates(); renderAll(); renderPeriods();
-  toast('Đã mở kỳ: '+s.month); try{ window.scrollTo({top:0,behavior:'smooth'}); }catch(e){}
+  toast('Đã mở kỳ: '+s.month); const tn=document.querySelector('.tr-tabs button[data-p="trich"]'); if(tn) tn.click(); try{ window.scrollTo({top:0,behavior:'smooth'}); }catch(e){}
 }
 async function deletePeriod(id){ await delKey('trich:period:'+id); PIDX=PIDX.filter(x=>x.id!==id); await save(KEY_PIDX,PIDX); renderPeriods(); toast('Đã xoá kỳ'); }
 function renderPeriods(){
+  const tb=$('trTabKy'); if(tb) tb.textContent='📂 Kỳ đã lưu ('+PIDX.length+')';
   const el=$('trPeriods'); if(!el) return; const cur=pid(CFG.month);
   el.innerHTML = PIDX.length? `<div class="tr-scroll"><table class="tr-t"><thead><tr><th>Kỳ tính</th><th>Lưu lúc</th><th>File đã nạp</th><th class="n">Tổng TC chi (GMHS)</th><th class="n">Tổng quỹ trích</th><th class="n">Quỹ công đoàn</th><th></th></tr></thead><tbody>${
     PIDX.map(p=>`<tr><td><b>${esc(p.month)}</b>${p.id===cur?' <span class="tr-pill ok">đang mở</span>':''}</td><td>${new Date(p.savedAt).toLocaleString('vi-VN')}</td><td class="tr-muted" style="white-space:normal">${p.files.map(esc).join('<br>')}</td>
