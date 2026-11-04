@@ -285,6 +285,7 @@ table.tr-t input[type=number]{width:120px; text-align:right;}
       <div class="sub" style="margin-top:4px;">
         <span class="pill" id="roleBadge">—</span>
         <button class="btn secondary small" id="btnLogout" style="margin-left:6px;">Đổi vai trò</button>
+        <button class="btn secondary small" id="btnSignOut" style="margin-left:6px;" title="Đăng xuất: xoá vai trò đã nhớ trên máy này, lần sau phải chọn lại vai trò">⏻ Đăng xuất</button>
       </div>
     </div>
   </header>
@@ -898,7 +899,7 @@ table.tr-t input[type=number]{width:120px; text-align:right;}
   <!-- ===================== TAB 6: TRÍCH TIỀN PT (bổ sung) ===================== -->
   <section class="tab" id="tab-trich">
   <div class="tr-root" id="trRoot">
-  <div class="tr-bar"><div class="t">Trích 6% cá nhân · phân bổ bộ phận hỗ trợ gián tiếp · chia tiền phẫu thuật mắt cho bác sĩ GMHS (BS 6 : nộp lại 4) · <b style="font-style:normal;color:var(--tr-accent)">Bản 04/11/2026 – v32</b></div>
+  <div class="tr-bar"><div class="t">Trích 6% cá nhân · phân bổ bộ phận hỗ trợ gián tiếp · chia tiền phẫu thuật mắt cho bác sĩ GMHS (BS 6 : nộp lại 4) · <b style="font-style:normal;color:var(--tr-accent)">Bản 04/11/2026 – v33</b></div>
     <div class="tr-month"><label for="trMonth">Kỳ tính</label><input type="text" id="trMonth" placeholder="Tháng 8/2026"><button class="tr-btn sec" id="trClose" type="button" title="Đóng thẻ 6 và quay về thẻ 1. Nhập dữ liệu">✕ Đóng · về trang chủ</button></div></div>
 
   <nav class="tr-tabs" role="tablist">
@@ -5471,6 +5472,17 @@ window.TrichPT={start, recalc:renderAll, _calc:()=>LAST};
 /* Khởi động khi mở thẻ 6 lần đầu (lúc đó app đã nạp xong Danh mục nhân viên) */
 const navBtn=document.getElementById('navTrichBtn');
 if(navBtn) navBtn.addEventListener('click',()=>{ if(!STARTED) start(); else renderAll(); });
+/* Đăng xuất: xoá vai trò đã nhớ trên máy, đưa về User và hiện màn hình chọn vai trò */
+(function(){ const so=document.getElementById('btnSignOut'); if(!so) return;
+  so.addEventListener('click',()=>{
+    try{ localStorage.removeItem('boiduong_pttt_role'); }catch(e){}
+    try{ CURRENT_ROLE='user'; }catch(e){}
+    try{ applyRolePermissions(); }catch(e){}
+    const b=document.querySelector('nav.tabs button[data-tab="import"]'); if(b) b.click();
+    const g=document.getElementById('loginGate'), rs=document.getElementById('loginRoleSelect'), pw=document.getElementById('loginPassWrap'), pi=document.getElementById('loginPassInput'), er=document.getElementById('loginError');
+    if(rs) rs.value='user'; if(pw) pw.style.display='none'; if(pi) pi.value=''; if(er) er.style.display='none';
+    if(g) g.style.display='flex';
+  }); })();
 /* Về trang chủ (thẻ 1) */
 function goHome(){ const b=document.querySelector('nav.tabs button[data-tab="import"]'); if(b) b.click(); try{ window.scrollTo({top:0,behavior:'smooth'}); }catch(e){ window.scrollTo(0,0); } }
 const closeBtn=document.getElementById('trClose'); if(closeBtn) closeBtn.addEventListener('click',goHome);
