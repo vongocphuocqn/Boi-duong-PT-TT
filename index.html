@@ -900,7 +900,7 @@ table.tr-t input[type=number]{width:120px; text-align:right;}
   <!-- ===================== TAB 6: TRÍCH TIỀN PT (bổ sung) ===================== -->
   <section class="tab" id="tab-trich">
   <div class="tr-root" id="trRoot">
-  <div class="tr-bar"><div class="t">Trích 6% cá nhân · phân bổ bộ phận hỗ trợ gián tiếp · chia tiền phẫu thuật mắt cho bác sĩ GMHS (BS 6 : nộp lại 4) · <b style="font-style:normal;color:var(--tr-accent)">Bản 04/11/2026 – v35</b></div>
+  <div class="tr-bar"><div class="t">Trích 6% cá nhân · phân bổ bộ phận hỗ trợ gián tiếp · chia tiền phẫu thuật mắt cho bác sĩ GMHS (BS 6 : nộp lại 4) · <b style="font-style:normal;color:var(--tr-accent)">Bản 04/11/2026 – v36</b></div>
     <div class="tr-month"><label for="trMonth">Kỳ tính</label><input type="text" id="trMonth" placeholder="Tháng 8/2026"><button class="tr-btn" id="trSavePeriod" type="button" style="background:var(--tr-good);border-color:var(--tr-good);margin-left:8px" title="Lưu toàn bộ file, ô tick và cấu hình của kỳ này">💾 Lưu kỳ tính</button><button class="tr-btn sec" id="trClose" type="button" title="Đóng thẻ 6 và quay về thẻ 1. Nhập dữ liệu">✕ Đóng · về trang chủ</button></div></div>
 
   <div id="trConfirm"></div>
@@ -5550,6 +5550,26 @@ if(typeof applyRolePermissions==='function'){
     if(!isAdmin && navBtn && navBtn.classList.contains('active')){ const b=document.querySelector('nav.tabs button[data-tab="import"]'); if(b) b.click(); } };
   try{ applyRolePermissions(); }catch(e){}
 }
+})();
+</script>
+<script>
+/* Thẻ 6: khi "Khôi phục từ file sao lưu" thì lấy lại cả các kỳ trích tiền đã lưu (cộng thêm, không xoá kỳ đang có) */
+(function(){
+  document.addEventListener('change', async function(e){
+    if(!e.target || e.target.id!=='restoreFileInput') return;
+    const f=e.target.files && e.target.files[0]; if(!f) return;
+    try{
+      const P=JSON.parse(await f.text()); if(!P || P.app!=='boiduong_pttt' || !P.entries) return;
+      const E=P.entries, keys=Object.keys(E).filter(k=>k.startsWith('trich:')); if(!keys.length) return;
+      let n=0;
+      for(const k of keys){ if(k.startsWith('trich:period:')){ const cur=await sGet(k); if(!cur || (E[k].savedAt||'')>(cur.savedAt||'')){ await sSet(k,E[k]); n++; } } }
+      if(Array.isArray(E['trich:periods'])){ const cur=(await sGet('trich:periods'))||[]; const m=new Map(cur.map(x=>[x.id,x]));
+        E['trich:periods'].forEach(x=>{ const o=m.get(x.id); if(!o || (x.savedAt||'')>(o.savedAt||'')) m.set(x.id,x); });
+        await sSet('trich:periods',[...m.values()].sort((a,b)=>(b.savedAt||'').localeCompare(a.savedAt||''))); }
+      for(const k of ['trich:cfg','trich:data']){ if(E[k] && !(await sGet(k))) await sSet(k,E[k]); }
+      if(n) console.log('Khôi phục thẻ 6:',n,'kỳ');
+    }catch(err){ console.warn('restore trich',err); }
+  }, true);
 })();
 </script>
 </body>
