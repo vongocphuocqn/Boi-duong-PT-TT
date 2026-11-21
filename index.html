@@ -4948,6 +4948,12 @@ function renderTN(N){
   $('trTNT').querySelector('tbody').innerHTML = N.rows.length? N.rows.map((r,i)=>`<tr><td class="c">${i+1}</td><td>${esc(r.name)}</td><td>${ROLES[r.role]||''}</td><td>${esc(r.stk)}</td>${c(r.mat)}<td class="n">${fmt(r.khac)}</td><td class="n">${fmt(r.amt)}</td><td class="n">${fmt(r.trich)}</td>${c(r.nop)}<td class="n">${fmt(r.nopTong)}</td>${c(r.gm)}<td class="n"><b>${fmt(r.thuc)}</b></td>${D?c(r.dsaAmt)+c(r.dsaTrich)+c(r.dsaCon)+c(r.dsa,1)+`<td class="n">${fmt(r.amt+r.dsaAmt)}</td><td class="n">${fmt(r.trich+r.dsaTrich)}</td><td class="n" style="background:var(--tr-goodbg)"><b>${fmt(r.tong2)}</b></td>`:''}<td class="tr-muted">${esc(r.note)}</td></tr>`).join('')
     : `<tr><td colspan="${D?20:13}" class="tr-muted">Chưa có dữ liệu. Nạp file ở mục “Nhập file”.</td></tr>`;
   const t=N.tot; $('trTNT').querySelector('tfoot').innerHTML = N.rows.length? `<tr><td></td><td colspan="3">Cộng (${N.rows.length} người)</td><td class="n">${fmt(t.mat)}</td><td class="n">${fmt(t.khac)}</td><td class="n">${fmt(t.amt)}</td><td class="n">${fmt(t.trich)}</td><td class="n">${fmt(t.nop)}</td><td class="n">${fmt(t.nopTong)}</td><td class="n">${fmt(t.gm)}</td><td class="n">${fmt(t.thuc)}</td>${D?`<td class="n">${fmt(t.dsaAmt)}</td><td class="n">${fmt(t.dsaTrich)}</td><td class="n">${fmt(t.dsaCon)}</td><td class="n">${fmt(t.dsa)}</td><td class="n">${fmt(t.amt+t.dsaAmt)}</td><td class="n">${fmt(t.trich+t.dsaTrich)}</td><td class="n">${fmt(t.tong2)}</td>`:''}<td></td></tr>`:'';
+  if(D && N.DS && N.DS.CD){ /* cách mới: DSA nộp 100% → cộng vào tổng nộp lại */
+    $('trTNT').querySelector('thead').innerHTML=`<tr><th colspan="4" class="c">Thông tin nhân viên</th><th colspan="8" class="c" style="${gA}">A. PHÒNG MỔ (Tài vụ chi)</th><th colspan="3" class="c" style="${gB}">B. PHÒNG DSA (nộp 100% về công đoàn)</th><th colspan="4" class="c" style="${gC}">C. TỔNG 2 NGUỒN</th><th></th></tr>
+     <tr><th>STT</th><th>Họ và tên</th><th>Chức danh</th><th>Số tài khoản</th><th class="n">(1) Tiền PT mắt</th><th class="n">(2) Tiền PT khác</th><th class="n">(3) Tài vụ chi PM</th><th class="n">(4) Trích 6%</th><th class="n">(5) Trừ 4 phần mắt</th><th class="n">(6) Tổng nộp lại PM</th><th class="n">(7) Nhận chia phụ mê mắt</th><th class="n">(8) Thực nhận PM</th><th class="n">(9) Tài vụ chi DSA</th><th class="n">(10) Nộp CĐ 100% DSA</th><th class="n">(11) CĐ chi lại DSA</th><th class="n">(12) Tổng tài vụ chi</th><th class="n">(13) TỔNG NỘP LẠI = (6)+(10)</th><th class="n">(14) Tổng CĐ chi lại = (7)+(11)</th><th class="n">(15) TỔNG THỰC NHẬN</th><th>Ghi chú</th></tr>`;
+    $('trTNT').querySelector('tbody').innerHTML = N.rows.map((r,i)=>`<tr><td class="c">${i+1}</td><td>${esc(r.name)}</td><td>${ROLES[r.role]||''}</td><td>${esc(r.stk)}</td>${c(r.mat)}<td class="n">${fmt(r.khac)}</td><td class="n">${fmt(r.amt)}</td><td class="n">${fmt(r.trich)}</td>${c(r.nop)}<td class="n">${fmt(r.nopTong)}</td>${c(r.gm)}<td class="n"><b>${fmt(r.thuc)}</b></td>${c(r.dsaAmt)}${c(r.dsaAmt)}${c(r.dsa,1)}<td class="n">${fmt(r.amt+r.dsaAmt)}</td><td class="n" style="background:var(--tr-warnbg)"><b>${fmt(r.nopTong+r.dsaAmt)}</b></td>${c(r.gm+r.dsa)}<td class="n" style="background:var(--tr-goodbg)"><b>${fmt(r.tong2)}</b></td><td class="tr-muted">${esc(r.note)}</td></tr>`).join('');
+    const t=N.tot; $('trTNT').querySelector('tfoot').innerHTML = `<tr><td></td><td colspan="3">Cộng (${N.rows.length} người)</td><td class="n">${fmt(t.mat)}</td><td class="n">${fmt(t.khac)}</td><td class="n">${fmt(t.amt)}</td><td class="n">${fmt(t.trich)}</td><td class="n">${fmt(t.nop)}</td><td class="n">${fmt(t.nopTong)}</td><td class="n">${fmt(t.gm)}</td><td class="n">${fmt(t.thuc)}</td><td class="n">${fmt(t.dsaAmt)}</td><td class="n">${fmt(t.dsaAmt)}</td><td class="n">${fmt(t.dsa)}</td><td class="n">${fmt(t.amt+t.dsaAmt)}</td><td class="n">${fmt(t.nopTong+t.dsaAmt)}</td><td class="n">${fmt(t.gm+t.dsa)}</td><td class="n">${fmt(t.tong2)}</td><td></td></tr>`;
+  }
 }
 function parseDsa(aoa,fname){
   const h=findHeader(aoa,['họ','tiền']); let cN=1,cS=2,cA=3;
@@ -5261,25 +5267,30 @@ async function exportTN(mode){
   if(hasStaff){
     // Cột: A STT, B Họ tên, C Chức danh, D STK | PHÒNG MỔ E..L | PHÒNG DSA M..P | TỔNG Q..S | Ghi chú
     line(7,'PHÒNG MỔ: (3) = (1) + (2);  (4) = (3) × '+CFG.pct+'%;  (5) = [(1) − (1) × '+CFG.pct+'%] × '+np+'/10;  (6) = (4) + (5);  (8) = (3) − (6) + (7)',{italic:true,size:11},NC);
-    if(DX) line(8,'PHÒNG DSA: (10) = (9) × '+CFG.pct+'%;  (11) = (9) − (10);  (12) = '+(dsaIsCD()?'phần công đoàn chia lại (người đại diện '+dsaRepPctTxt()+'%, phụ mê chia đều phần còn lại)':'½ phần còn lại của nhóm ('+dsaModeTxt()+'; phụ mê chia đều)')+'   |   TỔNG: (13) = (3) + (9);  (14) = (4) + (10);  (15) = (8) + (12);  (16) = (13) − (15)',{italic:true,size:11},NC);
+    const CDX=DX&&LAST.DS&&LAST.DS.CD;
+    if(CDX) line(8,'PHÒNG DSA: (10) = (9) nộp 100% về công đoàn;  (11) = phần công đoàn chi lại (người đại diện '+dsaRepPctTxt()+'%, phụ mê chia đều)   |   TỔNG: (12) = (3) + (9);  (13) TỔNG NỘP LẠI = (6) + (10);  (14) = (7) + (11);  (15) = (12) − (13) + (14);  (16) = (13) − (14)',{italic:true,size:11},NC);
+    else if(DX) line(8,'PHÒNG DSA: (10) = (9) × '+CFG.pct+'%;  (11) = (9) − (10);  (12) = '+(dsaIsCD()?'phần công đoàn chia lại (người đại diện '+dsaRepPctTxt()+'%, phụ mê chia đều phần còn lại)':'½ phần còn lại của nhóm ('+dsaModeTxt()+'; phụ mê chia đều)')+'   |   TỔNG: (13) = (3) + (9);  (14) = (4) + (10);  (15) = (8) + (12);  (16) = (13) − (15)',{italic:true,size:11},NC);
     const H=['STT','Họ và tên','Chức danh','Số tài khoản','(1) Tiền PT mắt','(2) Tiền PT khác','(3) Tài vụ chi phòng mổ','(4) Trích '+CFG.pct+'%','(5) Trừ '+np+' phần PT mắt','(6) Tổng nộp lại','(7) Nhận chia phụ mê mắt','(8) Thực nhận phòng mổ']
-      .concat(DX?['(9) Tài vụ chi DSA','(10) Trích '+CFG.pct+'%','(11) Còn lại','(12) Thực nhận DSA','(13) Tổng tài vụ chi','(14) Tổng trích '+CFG.pct+'%','(15) TỔNG THỰC NHẬN','(16) NỘP VỀ CÔNG ĐOÀN = (13) − (15) (âm: nhận lại)']:[],['Ghi chú']);
+      .concat(CDX?['(9) Tài vụ chi DSA','(10) Nộp công đoàn 100% DSA','(11) Công đoàn chi lại DSA','(12) Tổng tài vụ chi','(13) TỔNG NỘP LẠI = (6) + (10)','(14) Tổng công đoàn chi lại = (7) + (11)','(15) TỔNG THỰC NHẬN','(16) CHÊNH LỆCH NỘP VỀ CÔNG ĐOÀN = (13) − (14) (âm: nhận lại)']:DX?['(9) Tài vụ chi DSA','(10) Trích '+CFG.pct+'%','(11) Còn lại','(12) Thực nhận DSA','(13) Tổng tài vụ chi','(14) Tổng trích '+CFG.pct+'%','(15) TỔNG THỰC NHẬN','(16) NỘP VỀ CÔNG ĐOÀN = (13) − (15) (âm: nhận lại)']:[],['Ghi chú']);
     const HF=Object.assign({5:'DCE6F0',6:'DCE6F0',7:'BDD7EE',8:'F8CBAD',9:'F8CBAD',10:'F4B183',11:'C6E0B4',12:'FFE699'},DX?{13:'C6E0B4',14:'F8CBAD',15:'E2EFDA',16:'A9D08E',17:'D9D9D9',18:'F8CBAD',19:'FFD966',20:'F4B183'}:{});
     const BF=Object.assign({7:'EAF1FB',10:'FBE5D6',12:'FFF2CC'},DX?{13:'EAF4E4',16:'EAF4E4',19:'FFF2CC',20:'FBE5D6'}:{});
+    if(CDX){ Object.assign(HF,{14:'F4B183',15:'A9D08E',16:'D9D9D9',17:'F4B183',18:'C6E0B4',19:'FFD966',20:'F4B183'}); delete BF[16]; Object.assign(BF,{14:'FBE5D6',15:'EAF4E4',17:'FBE5D6'}); }
     // dòng 9: tiêu đề nhóm nguồn tiền
     const gh=(c1,c2,txt,col)=>{ const c=mg(9,c1,c2); c.value=txt; c.font=font({bold:true,size:12}); c.alignment={horizontal:'center',vertical:'middle'}; c.fill=fill(col); for(let k=c1;k<=c2;k++) ws.getCell(9,k).border=bd; };
     gh(1,4,'THÔNG TIN NHÂN VIÊN','D9D9D9'); gh(5,12,'A. PHÒNG MỔ (Tài vụ chi)','BDD7EE');
-    if(DX){ gh(13,16,'B. PHÒNG DSA (Tài vụ chi)','A9D08E'); gh(17,20,'C. TỔNG 2 NGUỒN','FFD966'); }
+    if(CDX){ gh(13,15,'B. PHÒNG DSA (nộp 100% về công đoàn)','A9D08E'); gh(16,20,'C. TỔNG 2 NGUỒN','FFD966'); }
+    else if(DX){ gh(13,16,'B. PHÒNG DSA (Tài vụ chi)','A9D08E'); gh(17,20,'C. TỔNG 2 NGUỒN','FFD966'); }
     gh(NC,NC,'','D9D9D9'); ws.getRow(9).height=22;
     const hr=ws.getRow(10); hr.height=48;
     H.forEach((h,i)=>{ const c=hr.getCell(i+1); c.value=h; c.font=font({bold:true,size:11}); c.alignment={horizontal:'center',vertical:'middle',wrapText:true}; c.fill=fill(HF[i+1]||'D9D9D9'); c.border=bd; });
-    const BOLD=new Set(DX?[12,16,19,20]:[12]);
+    const BOLD=new Set(CDX?[12,17,19,20]:DX?[12,16,19,20]:[12]);
     const writeRow=(R,stt,r)=>{ const row=ws.getRow(R);
       let v=[stt,r.name,ROLES[r.role]||'',String(r.stk||''),r.mat,
         {formula:`G${R}-E${R}`,result:r.khac}, r.amt, {formula:`ROUND(G${R}*${pct},0)`,result:r.trich},
         {formula:`(E${R}-ROUND(E${R}*${pct},0))-ROUND((E${R}-ROUND(E${R}*${pct},0))*${bs},0)`,result:r.nop},
         {formula:`H${R}+I${R}`,result:r.nopTong}, r.gm, {formula:`G${R}-J${R}+K${R}`,result:r.thuc}];
-      if(DX) v=v.concat([r.dsaAmt, {formula:`ROUND(M${R}*${pct},0)`,result:r.dsaTrich}, {formula:`M${R}-N${R}`,result:r.dsaCon}, r.dsa,
+      if(CDX) v=v.concat([r.dsaAmt, {formula:`M${R}`,result:r.dsaAmt}, r.dsa, {formula:`G${R}+M${R}`,result:r.amt+r.dsaAmt}, {formula:`J${R}+N${R}`,result:r.nopTong+r.dsaAmt}, {formula:`K${R}+O${R}`,result:r.gm+r.dsa}, {formula:`P${R}-Q${R}+R${R}`,result:r.tong2}, {formula:`Q${R}-R${R}`,result:r.nopTong+r.dsaAmt-r.gm-r.dsa}]);
+      else if(DX) v=v.concat([r.dsaAmt, {formula:`ROUND(M${R}*${pct},0)`,result:r.dsaTrich}, {formula:`M${R}-N${R}`,result:r.dsaCon}, r.dsa,
         {formula:`G${R}+M${R}`,result:r.amt+r.dsaAmt}, {formula:`H${R}+N${R}`,result:r.trich+r.dsaTrich}, {formula:`L${R}+P${R}`,result:r.tong2}, {formula:`Q${R}-S${R}`,result:r.amt+r.dsaAmt-r.tong2}]);
       v.push(r.note||'');
       v.forEach((x,k)=>{ const c=row.getCell(k+1); c.value=x; c.border=bd; c.font=font(BOLD.has(k+1)?{bold:true}:k===NC-1?{italic:true,size:10}:{});
@@ -5287,7 +5298,7 @@ async function exportTN(mode){
         if(BF[k+1]) c.fill=fill(BF[k+1]); }); };
     const vals=rows=>{ const s=k=>rows.reduce((a,x)=>a+x[k],0);
       return Object.assign({5:s('mat'),6:s('khac'),7:s('amt'),8:s('trich'),9:s('nop'),10:s('nopTong'),11:s('gm'),12:s('thuc')},
-        DX?{13:s('dsaAmt'),14:s('dsaTrich'),15:s('dsaCon'),16:s('dsa'),17:s('amt')+s('dsaAmt'),18:s('trich')+s('dsaTrich'),19:s('tong2'),20:s('amt')+s('dsaAmt')-s('tong2')}:{}); };
+        CDX?{13:s('dsaAmt'),14:s('dsaAmt'),15:s('dsa'),16:s('amt')+s('dsaAmt'),17:s('nopTong')+s('dsaAmt'),18:s('gm')+s('dsa'),19:s('tong2'),20:s('nopTong')+s('dsaAmt')-s('gm')-s('dsa')}:DX?{13:s('dsaAmt'),14:s('dsaTrich'),15:s('dsaCon'),16:s('dsa'),17:s('amt')+s('dsaAmt'),18:s('trich')+s('dsaTrich'),19:s('tong2'),20:s('amt')+s('dsaAmt')-s('tong2')}:{}); };
     const totRow=(R,label,fx,tv,fillOf)=>{ const tr=ws.getRow(R);
       for(let k=1;k<=NC;k++){ const c=tr.getCell(k); c.border=bd; c.font=font({bold:true}); c.fill=fill(fillOf(k));
         if(tv[k]!==undefined){ c.value={formula:fx(k),result:tv[k]}; c.numFmt=NUM; c.alignment={horizontal:'right'}; } }
