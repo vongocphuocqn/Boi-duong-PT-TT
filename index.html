@@ -900,7 +900,7 @@ table.tr-t input[type=number]{width:120px; text-align:right;}
   <!-- ===================== TAB 6: TRÍCH TIỀN PT (bổ sung) ===================== -->
   <section class="tab" id="tab-trich">
   <div class="tr-root" id="trRoot">
-  <div class="tr-bar"><div class="t">Trích 6% cá nhân · phân bổ bộ phận hỗ trợ gián tiếp · chia tiền phẫu thuật mắt cho bác sĩ GMHS (BS 6 : nộp lại 4) · <b style="font-style:normal;color:var(--tr-accent)">Bản 21/11/2026 – v44</b></div>
+  <div class="tr-bar"><div class="t">Trích 6% cá nhân · phân bổ bộ phận hỗ trợ gián tiếp · chia tiền phẫu thuật mắt cho bác sĩ GMHS (BS 6 : nộp lại 4) · <b style="font-style:normal;color:var(--tr-accent)">Bản 22/11/2026 – v45</b></div>
     <div class="tr-month"><label for="trMonth">Kỳ tính</label><input type="text" id="trMonth" placeholder="Tháng 8/2026"><button class="tr-btn" id="trSavePeriod" type="button" style="background:var(--tr-good);border-color:var(--tr-good);margin-left:8px" title="Lưu toàn bộ file, ô tick và cấu hình của kỳ này">💾 Lưu kỳ tính</button><button class="tr-btn sec" id="trClose" type="button" title="Đóng thẻ 6 và quay về thẻ 1. Nhập dữ liệu">✕ Đóng · về trang chủ</button></div></div>
 
   <div id="trConfirm"></div>
@@ -5878,6 +5878,45 @@ if(typeof applyRolePermissions==='function'){
       if(n) console.log('Khôi phục thẻ 6:',n,'kỳ');
     }catch(err){ console.warn('restore trich',err); }
   }, true);
+})();
+</script>
+<!-- ===== Chế độ phóng đại (v44) ===== -->
+<style>
+#zmBox{position:fixed;right:14px;bottom:14px;z-index:9999;display:flex;align-items:center;gap:4px;background:#14304a;color:#fff;border-radius:22px;padding:5px 8px;box-shadow:0 3px 12px rgba(0,0,0,.25);font:14px 'Times New Roman',serif}
+#zmBox button{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.45);border-radius:14px;min-width:32px;height:28px;cursor:pointer;font:inherit;font-weight:bold;padding:0 8px}
+#zmBox button:hover{background:rgba(255,255,255,.18)}
+#zmBox #zmVal{min-width:52px;text-align:center;font-weight:bold;cursor:pointer}
+#zmBox.min #zmMore{display:none}
+@media print{#zmBox{display:none}}
+</style>
+<div id="zmBox" title="Chế độ phóng đại — phím tắt: Alt + (+) phóng to, Alt + (−) thu nhỏ, Alt + 0 về 100%">
+  <span style="padding:0 4px">🔍</span>
+  <span id="zmMore" style="display:flex;align-items:center;gap:4px">
+    <button id="zmOut" aria-label="Thu nhỏ">A−</button>
+    <span id="zmVal" title="Bấm để về 100%">100%</span>
+    <button id="zmIn" aria-label="Phóng to">A+</button>
+    <button id="zmFit" title="Phóng to vừa màn hình đọc (125%)">125%</button>
+    <button id="zmFull" title="Toàn màn hình (Esc để thoát)">⛶</button>
+  </span>
+  <button id="zmHide" title="Thu gọn / mở thanh phóng đại">–</button>
+</div>
+<script>
+(function(){
+  const K='pttt_zoom', KH='pttt_zoom_min', MIN=70, MAX=200, ST=10;
+  let z=100; try{ z=+localStorage.getItem(K)||100; }catch(e){}
+  const box=document.getElementById('zmBox'), val=document.getElementById('zmVal');
+  function apply(){ z=Math.min(MAX,Math.max(MIN,Math.round(z))); document.body.style.zoom=(z/100); box.style.zoom=(100/z); val.textContent=z+'%'; try{ localStorage.setItem(K,z); }catch(e){} }
+  function set(v){ z=v; apply(); }
+  document.getElementById('zmIn').onclick=()=>set(z+ST);
+  document.getElementById('zmOut').onclick=()=>set(z-ST);
+  val.onclick=()=>set(100);
+  document.getElementById('zmFit').onclick=()=>set(125);
+  document.getElementById('zmFull').onclick=()=>{ try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }catch(e){} };
+  document.getElementById('zmHide').onclick=()=>{ box.classList.toggle('min'); document.getElementById('zmHide').textContent=box.classList.contains('min')?'+':'–'; try{ localStorage.setItem(KH,box.classList.contains('min')?'1':''); }catch(e){} };
+  try{ if(localStorage.getItem(KH)==='1'){ box.classList.add('min'); document.getElementById('zmHide').textContent='+'; } }catch(e){}
+  document.addEventListener('keydown',e=>{ if(!e.altKey||e.ctrlKey||e.metaKey) return;
+    if(e.key==='='||e.key==='+'){ e.preventDefault(); set(z+ST); } else if(e.key==='-'||e.key==='_'){ e.preventDefault(); set(z-ST); } else if(e.key==='0'){ e.preventDefault(); set(100); } });
+  apply();
 })();
 </script>
 </body>
