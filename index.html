@@ -1031,6 +1031,16 @@ table.tr-t input[type=number]{width:120px; text-align:right;}
         <button class="tr-btn" id="trDsaAddBtn1">Thêm</button>
       </div>
     </div>
+    <div class="tr-card" style="grid-column:1/-1">
+      <h2>📝 Ghi chú theo dõi</h2>
+      <p class="tr-muted">Ghi lại các thay đổi, điều chỉnh trong kỳ (ví dụ: thêm/bớt nhân sự, đổi người đại diện, điều chỉnh mức chi hộ lý, lý do sửa số liệu…). Ghi chú tự lưu khi gõ và được lưu kèm theo từng kỳ khi bấm <b>💾 Lưu kỳ tính</b>; mở lại kỳ cũ sẽ thấy đúng ghi chú của kỳ đó.</p>
+      <textarea id="trNote" rows="7" style="width:100%;box-sizing:border-box;font:inherit;font-size:15px;line-height:1.5;padding:10px 12px;border:1px solid var(--tr-line);border-radius:4px;resize:vertical" placeholder="Ví dụ: [22/11/2026] Tháng 9: thêm hộ lý Lương Phan Thu Hằng; người đại diện DSA: Võ Huy Cường…"></textarea>
+      <div class="tr-row" style="margin-top:8px;align-items:center">
+        <button class="tr-btn" id="trNoteStamp">📅 Thêm dòng có ngày giờ</button>
+        <button class="tr-btn" id="trNoteCopy">Sao chép ghi chú</button>
+        <span class="tr-muted" id="trNoteInfo"></span>
+      </div>
+    </div>
   </section>
 
   <!-- ================= 3. TRÍCH 6% & PHÂN BỔ ================= -->
@@ -5201,7 +5211,8 @@ const KEY_PIDX='trich:periods'; let PIDX=[];
 function pid(m){ return 'p_'+String(m||'ky').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[đĐ]/g,'d').replace(/[^\dA-Za-z]+/g,'_'); }
 async function delKey(k){ try{ if(APP && typeof sDelete==='function') return await sDelete(k); if(hasWS()) await window.storage.delete(k,false); else localStorage.removeItem(k); }catch(e){} }
 async function loadPIDX(){ PIDX=(await load(KEY_PIDX))||[]; renderPeriods(); }
-function fillInputs(){ const m={trPct:'pct',trBasis:'basis',trDDT:'ddt',trHCPM:'hcpm',trHCK:'hck',trHCKr:'hckRatio',trScope:'scope',trPrefix:'prefix',trBsPct:'bsPct',trMonth:'month',trCDName:'cdName',trCDStk:'cdStk',trHLamt:'hlMuc'};
+function noteInfo(){ const el=$('trNoteInfo'); if(!el) return; const t=(CFG.note||'').trim(); el.textContent = t? (t.split('\n').filter(x=>x.trim()).length+' dòng'+(CFG.noteAt?' · sửa lần cuối '+new Date(CFG.noteAt).toLocaleString('vi-VN'):'')) : 'Chưa có ghi chú'; }
+function fillInputs(){ { const t=$('trNote'); if(t){ t.value=CFG.note||''; noteInfo(); } } const m={trPct:'pct',trBasis:'basis',trDDT:'ddt',trHCPM:'hcpm',trHCK:'hck',trHCKr:'hckRatio',trScope:'scope',trPrefix:'prefix',trBsPct:'bsPct',trMonth:'month',trCDName:'cdName',trCDStk:'cdStk',trHLamt:'hlMuc'};
   Object.keys(m).forEach(id=>{ const el=$(id); if(el) el.value=CFG[m[id]]==null?'':CFG[m[id]]; }); const e=$('trEyeToFund'); if(e) e.checked=!!CFG.eyeToFund; }
 async function savePeriod(){
   if(!DATA.fin && !DATA.his && !DATA.dsa){ toast('Chưa nạp file nào để lưu'); return; }
@@ -5212,7 +5223,7 @@ async function savePeriod(){
   const sum={nv:L.T?L.T.rows.length:0, tc:L.T?L.T.amt:0, fund:L.P?L.P.fund:0, cd:L.P?L.P.cd:0, dsa:L.DS?L.DS.S:0};
   const snap={id,month:m,savedAt:new Date().toISOString(),data:{fin:DATA.fin,his,dsa:DATA.dsa||null},cfg:JSON.parse(JSON.stringify(CFG)),sum};
   const ok=await save('trich:period:'+id,snap); if(ok===false){ toast('Lưu kỳ không thành công — kiểm tra dung lượng trình duyệt'); return; }
-  PIDX=PIDX.filter(x=>x.id!==id); PIDX.unshift({id,month:m,savedAt:snap.savedAt,files,sum}); await save(KEY_PIDX,PIDX);
+  PIDX=PIDX.filter(x=>x.id!==id); PIDX.unshift({id,month:m,savedAt:snap.savedAt,files,sum,note:(CFG.note||'').trim().slice(0,300)}); await save(KEY_PIDX,PIDX);
   renderPeriods(); toast('✔ Đã lưu kỳ: '+m+' — xem ở mục “📂 Kỳ đã lưu”'); const tb=$('trTabKy'); if(tb) tb.click();
 }
 async function openPeriod(id){
@@ -5225,9 +5236,9 @@ async function deletePeriod(id){ await delKey('trich:period:'+id); PIDX=PIDX.fil
 function renderPeriods(){
   const tb=$('trTabKy'); if(tb) tb.textContent='📂 Kỳ đã lưu ('+PIDX.length+')';
   const el=$('trPeriods'); if(!el) return; const cur=pid(CFG.month);
-  el.innerHTML = PIDX.length? `<div class="tr-scroll"><table class="tr-t"><thead><tr><th>Kỳ tính</th><th>Lưu lúc</th><th>File đã nạp</th><th class="n">Tổng TC chi (GMHS)</th><th class="n">Tổng quỹ trích</th><th class="n">Quỹ công đoàn</th><th></th></tr></thead><tbody>${
+  el.innerHTML = PIDX.length? `<div class="tr-scroll"><table class="tr-t"><thead><tr><th>Kỳ tính</th><th>Lưu lúc</th><th>File đã nạp</th><th class="n">Tổng TC chi (GMHS)</th><th class="n">Tổng quỹ trích</th><th class="n">Quỹ công đoàn</th><th>Ghi chú</th><th></th></tr></thead><tbody>${
     PIDX.map(p=>`<tr><td><b>${esc(p.month)}</b>${p.id===cur?' <span class="tr-pill ok">đang mở</span>':''}</td><td>${new Date(p.savedAt).toLocaleString('vi-VN')}</td><td class="tr-muted" style="white-space:normal">${p.files.map(esc).join('<br>')}</td>
-      <td class="n">${fmt(p.sum.tc)}</td><td class="n">${fmt(p.sum.fund)}</td><td class="n">${fmt(p.sum.cd)}</td>
+      <td class="n">${fmt(p.sum.tc)}</td><td class="n">${fmt(p.sum.fund)}</td><td class="n">${fmt(p.sum.cd)}</td><td class="tr-muted" style="white-space:pre-line;max-width:320px;font-size:13px">${p.note?esc(p.note):''}</td>
       <td style="white-space:nowrap"><button class="tr-btn sm" data-popen="${p.id}">Mở lại</button> <button class="tr-btn del sm" data-pdel="${p.id}">Xoá</button></td></tr>`).join('')}</tbody></table></div>`
     : '<p class="tr-muted">Chưa có kỳ nào được lưu.</p>';
 }
@@ -5624,7 +5635,7 @@ async function exportDC(){
 }
 let LAST=null;
 function renderAll(){
-  renderStatus();
+  renderStatus(); { const t=$('trNote'); if(t && document.activeElement!==t) t.value=CFG.note||''; noteInfo(); }
   const T=renderStaff(); const E=calcEye(); const DS=calcDSA(); const P=calcPB(T,E,DS);
   renderTrich(T,P,E); renderEye(E); renderSummary(T,P,E); renderGroup($('trGrp1'),T); renderGroup($('trGrp3'),T); renderHL(); renderGroupHL(); renderGroupGM(E); renderExpSel(); const D=calcDC(E); renderDC(D); renderDSA(DS); renderTN(calcThucNhan(T,E,DS));
   LAST={T,P,E,D,DS};
@@ -5662,7 +5673,16 @@ function exportXlsx(){
 }
 
 /* ---------------- events ---------------- */
+function bindNote(){
+  const t=$('trNote'); if(!t) return;
+  t.addEventListener('input',()=>{ CFG.note=t.value; CFG.noteAt=new Date().toISOString(); persist(); noteInfo(); });
+  $('trNoteStamp').addEventListener('click',()=>{ const d=new Date(), p=n=>String(n).padStart(2,'0');
+    const st='['+p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes())+'] ';
+    t.value=(t.value&&!t.value.endsWith('\n')?t.value+'\n':t.value)+st; t.dispatchEvent(new Event('input')); t.focus(); t.setSelectionRange(t.value.length,t.value.length); });
+  $('trNoteCopy').addEventListener('click',async()=>{ try{ await navigator.clipboard.writeText(t.value||''); toast('Đã sao chép ghi chú'); }catch(e){ t.select(); document.execCommand('copy'); toast('Đã sao chép ghi chú'); } });
+}
 function bindAll(){
+  bindNote();
   document.querySelectorAll('.tr-tabs button').forEach(b=>b.addEventListener('click',()=>{
     document.querySelectorAll('.tr-tabs button').forEach(x=>x.setAttribute('aria-selected','false'));
     document.querySelectorAll('.tr-pane').forEach(x=>x.classList.remove('on'));
